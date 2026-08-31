@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>mp3-frame-counter — knowledge log</title>
+<link rel="stylesheet" href="assets/docs.css">
+</head>
+<body>
+<h1>Knowledge log</h1>
+<p class="scope">Table of contents for everything measured, learned, or
+designed while building the frame counter. Reasoning lives in
+<code>DECISIONS.md</code>, not here.</p>
+
+<h2>Concepts</h2>
+<table>
+  <tr>
+    <td><a href="concepts/mp3-structure.html">MPEG-1 Layer III file structure</a></td>
+    <td>File anatomy, header bit fields, frame-length formula, tags and VBR headers.</td>
+  </tr>
+</table>
+
+<h2>Evidence</h2>
+<table>
+  <tr>
+    <td><a href="evidence/sample-ground-truth.html">Sample ground truth</a></td>
+    <td>mediainfo/ffprobe reports, byte dumps, independent frame walk; why the expected count is 6089, not 6090.</td>
+  </tr>
+</table>
+
+<h2>Model</h2>
+<p>Added when the system takes shape (steps 4–6): architecture page,
+reviewer Q&amp;A (<code>qa.html</code>).</p>
+</body>
+</html>

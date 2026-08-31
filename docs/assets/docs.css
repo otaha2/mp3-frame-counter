@@ -1,0 +1,88 @@
+/* Shared stylesheet for the knowledge log. Light and dark via prefers-color-scheme. */
+
+:root {
+  --bg: #ffffff;
+  --fg: #1a1f24;
+  --muted: #5c6670;
+  --accent: #0b6bcb;
+  --border: #d9dee3;
+  --code-bg: #f2f4f6;
+  --mark: #fff3c4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14181c;
+    --fg: #e4e8ec;
+    --muted: #9aa4ae;
+    --accent: #5aa9f0;
+    --border: #333a41;
+    --code-bg: #1e242a;
+    --mark: #4a4020;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0 auto;
+  max-width: 52rem;
+  padding: 2rem 1.25rem 4rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: 16px/1.55 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+h1 { font-size: 1.5rem; margin: 0 0 0.25rem; }
+h2 { font-size: 1.15rem; margin: 2rem 0 0.5rem; }
+
+/* The one-line "what this page covers / which code it informs" opener. */
+p.scope {
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.75rem;
+  margin-top: 0;
+}
+
+a { color: var(--accent); }
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.75rem 0;
+  font-size: 0.925rem;
+}
+th, td {
+  border: 1px solid var(--border);
+  padding: 0.35rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+th { background: var(--code-bg); }
+
+code, pre {
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.875em;
+  background: var(--code-bg);
+  border-radius: 4px;
+}
+code { padding: 0.1em 0.35em; }
+pre {
+  padding: 0.75rem 1rem;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+}
+pre code { padding: 0; background: none; }
+
+mark { background: var(--mark); color: inherit; padding: 0 0.15em; }
+
+figure { margin: 1rem 0; }
+figure svg { max-width: 100%; height: auto; }
+figcaption { color: var(--muted); font-size: 0.85rem; margin-top: 0.35rem; }
+
+/* Diagram text inherits page colors so SVGs work in both themes. */
+svg text { fill: var(--fg); font: 13px ui-monospace, Consolas, monospace; }
+svg .lbl { fill: var(--muted); font: 12px system-ui, sans-serif; }
+svg .box { fill: var(--code-bg); stroke: var(--border); }
+svg .hot { stroke: var(--accent); fill: none; }
+svg .arrow { stroke: var(--fg); fill: none; marker-end: url(#head); }

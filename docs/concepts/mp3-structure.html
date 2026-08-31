@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MPEG-1 Layer III file structure</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<h1>MPEG-1 Layer III file structure</h1>
+<p class="scope">Covers the byte layout of an MP3 file and the frame-header
+fields; informs <code>src/mp3/frameHeader.ts</code> and both counters.</p>
+
+<h2>File anatomy</h2>
+<p>An MP3 file is a flat sequence of self-describing frames, optionally wrapped
+in metadata tags that are not frames:</p>
+<pre><code>[ID3v2 tag?] [frame][frame][frame] ... [frame] [ID3v1 tag?]</code></pre>
+<ul>
+  <li><strong>ID3v2</strong> (start, optional): 10-byte header
+    <code>"ID3" ver(2) flags(1) size(4)</code>. The size is
+    <em>syncsafe</em> — 4 bytes of 7 bits each
+    (<code>(b6&lt;&lt;21)|(b7&lt;&lt;14)|(b8&lt;&lt;7)|b9</code>), covering the
+    tag body after the 10-byte header. Skipped, never parsed.</li>
+  <li><strong>ID3v1</strong> (end, optional): exactly 128 bytes beginning
+    <code>"TAG"</code> at <code>EOF−128</code>. Contains no frames.</li>
+  <li><strong>Xing/Info/VBRI frame</strong> (optional): the first frame after
+    ID3v2 may be a metadata frame — a valid header whose payload holds encoder
+    data instead of audio. <code>"Xing"</code> (VBR) or <code>"Info"</code>
+    (CBR, LAME) appears 36 bytes into the frame for MPEG-1 stereo
+    (4 header + 32 side-info bytes); <code>"VBRI"</code> at offset 36
+    regardless. Its count/byte fields describe the rest of the stream.
+    Counting policy: see DECISIONS.md D1.</li>
+</ul>
+
+<h2>Frame header — 4 bytes, big-endian</h2>
+<table>
+  <tr><th>Bits</th><th>Field</th><th>Accepted values (this project)</th></tr>
+  <tr><td>31–21</td><td>Sync</td><td>all 1s (<code>0x7FF</code>)</td></tr>
+  <tr><td>20–19</td><td>Version</td><td><code>11</code> = MPEG-1 only (per assignment)</td></tr>
+  <tr><td>18–17</td><td>Layer</td><td><code>01</code> = Layer III only</td></tr>
+  <tr><td>16</td><td>CRC protection</td><td>either (affects payload, not length)</td></tr>
+  <tr><td>15–12</td><td>Bitrate index</td><td>1–14 → 32…320 kbps; <code>0000</code> (free) and <code>1111</code> rejected</td></tr>
+  <tr><td>11–10</td><td>Sample-rate index</td><td><code>00</code>=44100, <code>01</code>=48000, <code>10</code>=32000; <code>11</code> rejected</td></tr>
+  <tr><td>9</td><td>Padding</td><td>0 or 1 — adds one byte to the frame</td></tr>
+  <tr><td>8–0</td><td>Private, channel mode, mode ext., copyright, original, emphasis</td><td>any — irrelevant to frame length</td></tr>
+</table>
+
+<p>MPEG-1 Layer III bitrate table (index → kbps):
+<code>1→32, 2→40, 3→48, 4→56, 5→64, 6→80, 7→96, 8→112, 9→128, 10→160,
+11→192, 12→224, 13→256, 14→320</code>.</p>
+
+<h2>Frame length — how the walk works</h2>
+<p>Every MPEG-1 Layer III frame carries 1152 samples, so its byte length is
+fully determined by its own header:</p>
+<pre><code>frameLength = floor(144 × bitrate / sampleRate) + padding</code></pre>
+<p>(144 = 1152 samples ÷ 8 bits.) The counter never scans for the next sync —
+it <em>jumps</em> by the computed length and expects a valid header at the
+landing offset. A scan is only used to resync after an invalid header.</p>
+
+<figure>
+<svg viewBox="0 0 680 150" xmlns="http://www.w3.org/2000/svg" role="img"
+     aria-label="Frame walk: each header's fields compute the jump to the next header">
+  <defs>
+    <marker id="head" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6" fill="none" stroke="currentColor"/>
+    </marker>
+  </defs>
+  <!-- frame 1 -->
+  <rect class="box" x="10" y="40" width="40" height="40"/>
+  <rect class="hot" x="10" y="40" width="40" height="40"/>
+  <text x="14" y="65">hdr</text>
+  <rect class="box" x="50" y="40" width="200" height="40"/>
+  <text x="105" y="65">audio data</text>
+  <!-- frame 2 -->
+  <rect class="box" x="250" y="40" width="40" height="40"/>
+  <rect class="hot" x="250" y="40" width="40" height="40"/>
+  <text x="254" y="65">hdr</text>
+  <rect class="box" x="290" y="40" width="130" height="40"/>
+  <text x="315" y="65">audio</text>
+  <!-- frame 3 -->
+  <rect class="box" x="420" y="40" width="40" height="40"/>
+  <rect class="hot" x="420" y="40" width="40" height="40"/>
+  <text x="424" y="65">hdr</text>
+  <rect class="box" x="460" y="40" width="200" height="40"/>
+  <text x="520" y="65">audio data</text>
+  <!-- jump arrows -->
+  <path class="arrow" d="M30,38 C 80,5 210,5 268,36" stroke="currentColor"/>
+  <path class="arrow" d="M270,38 C 305,12 400,12 438,36" stroke="currentColor"/>
+  <text class="lbl" x="80" y="18">+floor(144·64000/44100)+0 = 208 B</text>
+  <text class="lbl" x="315" y="26">+104 B (32 kbps)</text>
+  <!-- byte offsets from the sample -->
+  <text class="lbl" x="10" y="105">offset 44</text>
+  <text class="lbl" x="250" y="105">offset 252</text>
+  <text class="lbl" x="420" y="105">offset 356</text>
+  <text class="lbl" x="10" y="135">Each header alone determines the distance to the next header — sizes taken from the sample's first three frames.</text>
+</svg>
+<figcaption>The frame walk: parse 4 bytes, compute the length, jump. VBR just
+means the jump distance changes per frame.</figcaption>
+</figure>
+
+<p>See the <a href="../evidence/sample-ground-truth.html">sample ground-truth
+page</a> for these structures measured on the real file.</p>
+</body>
+</html>

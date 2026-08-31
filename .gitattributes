@@ -1,0 +1,3 @@
+# Normalise to LF in the repository; the fixtures must never be touched.
+* text=auto eol=lf
+*.mp3 binary

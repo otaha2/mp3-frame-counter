@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sample ground truth</title>
+<link rel="stylesheet" href="../assets/docs.css">
+</head>
+<body>
+<h1>Sample ground truth</h1>
+<p class="scope">Measured facts about <code>test/fixtures/sample.mp3</code>
+from outside tools; informs <code>test/fixtures/expected-counts.json</code>
+and DECISIONS.md D1.</p>
+
+<h2>File identity</h2>
+<table>
+  <tr><th>Size</th><td>1,458,172 bytes</td></tr>
+  <tr><th>SHA-256</th><td><code>97707a18a58ba75122b1668f5ed738f090121343432d9172a6409ddfa4fc5ab3</code></td></tr>
+  <tr><th>Tools</th><td>MediaInfoLib v26.05 (winget MediaArea.MediaInfo), ffprobe 9.0.1 (winget Gyan.FFmpeg), GNU od, Node 20 walker script</td></tr>
+</table>
+
+<h2>Tool reports</h2>
+<table>
+  <tr><th></th><th>mediainfo --Full</th><th>ffprobe -count_frames</th></tr>
+  <tr><th>Format</th><td>MPEG Audio, Version 1, Layer 3</td><td>codec <code>mp3</code></td></tr>
+  <tr><th>Mode</th><td>Joint stereo / MS, 2ch, 44100 Hz</td><td>2ch, 44100 Hz</td></tr>
+  <tr><th>Bit rate</th><td>VBR, 73,327 b/s overall</td><td>73,337 b/s</td></tr>
+  <tr><th>Frame count</th><td><mark>6089</mark> (1152 samples/frame)</td><td><code>nb_read_frames=</code><mark>6089</mark></td></tr>
+  <tr><th>Duration</th><td>159.060 s = 6089 × 1152 ÷ 44100</td><td>159.033 s (decoder trims LAME encoder delay — irrelevant to counting)</td></tr>
+  <tr><th>Writing library</th><td>LAME3.100 (container: Lavf60.3.100)</td><td>—</td></tr>
+</table>
+
+<h2>Byte-level findings (od + walker)</h2>
+<table>
+  <tr><th>Offset</th><th>Bytes</th><th>Meaning</th></tr>
+  <tr><td>0</td><td><code>49 44 33 04 00 00 | 00 00 00 22</code></td>
+      <td>ID3v2.4 tag; syncsafe size 0x22 = 34 → tag occupies bytes 0–43</td></tr>
+  <tr><td>10</td><td><code>TSSE … "Lavf60.3.100"</code></td>
+      <td>Sole tag content: encoder software string</td></tr>
+  <tr><td>44</td><td><code>ff fb 50 00</code></td>
+      <td>First frame: MPEG-1 Layer III, no CRC, 64 kbps, 44100 Hz, no padding → length floor(144·64000/44100)+0 = 208</td></tr>
+  <tr><td>80</td><td><code>"Xing" 00 00 00 0f | 00 00 17 c9 | 00 16 3f d0</code></td>
+      <td>Xing header 36 bytes into frame 1 (4 hdr + 32 side info, MPEG-1 stereo). Flags 0xF (frames, bytes, TOC, quality). Frames = 0x17C9 = <mark>6089</mark>; bytes = 0x163FD0 = 1,458,128 = file − ID3v2</td></tr>
+  <tr><td>252</td><td><code>ff fb 10 64</code></td>
+      <td>Second frame — first audio frame: 32 kbps → 104 bytes</td></tr>
+  <tr><td>1,458,068</td><td><code>ff fb 10 64</code></td>
+      <td>Last frame: 104 bytes, ends exactly at EOF (1,458,172)</td></tr>
+  <tr><td>1,458,044</td><td>no <code>"TAG"</code></td>
+      <td>No ID3v1 tail; file ends inside the final frame's 0xAA fill bytes</td></tr>
+</table>
+
+<h2>Independent frame walk</h2>
+<p>A throwaway Node script walked the file from offset 44, jumping by each
+header's computed length and resyncing byte-by-byte on failure:</p>
+<table>
+  <tr><th>Physical frames found</th><td><mark>6090</mark></td></tr>
+  <tr><th>Bytes not part of any frame</th><td>0 — frames tile offset 44 → EOF exactly</td></tr>
+  <tr><th>Bitrate histogram (kbps → frames)</th>
+      <td><code>32→49, 40→11, 48→23, 56→102, 64→2352, 80→3374, 96→136, 112→27, 128→11, 160→5</code> — genuine VBR</td></tr>
+</table>
+
+<h2>The discrepancy, resolved</h2>
+<p>Physical walk: <strong>6090</strong>. mediainfo, ffprobe, and the file's own
+Xing field: <strong>6089</strong>. The difference is exactly frame 1 — the
+Xing metadata frame, which is a validly-shaped frame carrying no audio.
+Reference tools exclude it; the Xing field's byte count (which <em>includes</em>
+its own frame) confirms the count field describes the frames after it.
+Decision: report 6089-style counts — physical frames minus a detected
+Xing/Info/VBRI frame (DECISIONS.md D1). Expected count for this file:
+<mark>6089</mark>.</p>
+</body>
+</html>
