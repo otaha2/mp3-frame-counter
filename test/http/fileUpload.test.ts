@@ -116,6 +116,29 @@ describe('POST /file-upload', () => {
     expect(body.message).toContain(contentType);
   });
 
+  it('rejects a request with no Content-Type at all', async () => {
+    // Fastify skips body parsing without a Content-Type, so this exercises the
+    // route's own guard rather than the catch-all parser.
+    app = build();
+
+    const response = await app.inject({ method: 'POST', url: '/file-upload' });
+
+    expect(response.statusCode).toBe(415);
+    expect(response.json<ErrorBody>()).toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE' });
+  });
+
+  it('accepts a file part under any field name', async () => {
+    app = build();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/file-upload',
+      ...multipartFile('audio', 'sample.mp3', Buffer.alloc(256, 0x41)),
+    });
+
+    expect(response.statusCode).toBe(200);
+  });
+
   it('answers 404 in the standard error shape for an unknown route', async () => {
     app = build();
 

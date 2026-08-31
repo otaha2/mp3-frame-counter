@@ -23,13 +23,17 @@ export interface ErrorBody {
   readonly message: string;
 }
 
+function statusText(statusCode: number): string {
+  return STATUS_CODES[statusCode] ?? 'Error';
+}
+
 function errorBody(statusCode: number, code: string, message: string): ErrorBody {
-  return {
-    statusCode,
-    code,
-    error: STATUS_CODES[statusCode] ?? 'Error',
-    message,
-  };
+  return { statusCode, code, error: statusText(statusCode), message };
+}
+
+/** Fallback `code` for a framework error that carries none: `PAYLOAD_TOO_LARGE`. */
+function codeFromStatus(statusCode: number): string {
+  return statusText(statusCode).toUpperCase().replace(/\s+/g, '_');
 }
 
 /**
@@ -53,32 +57,33 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
     },
   });
 
+  // Catches every Content-Type except multipart/form-data. A request with no
+  // Content-Type header at all never reaches a parser, so the route guards
+  // that case itself; the two checks together cover every non-multipart body.
   app.addContentTypeParser('*', (request, _payload, done) => {
     done(new UnsupportedMediaTypeError(request.headers['content-type']), undefined);
   });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
-      void reply
+      return reply
         .status(error.statusCode)
         .send(errorBody(error.statusCode, error.code, error.message));
-      return;
     }
 
-    // Errors raised by Fastify or its plugins already carry a status and code;
-    // client-side ones are safe to forward verbatim.
+    // Errors raised by Fastify or its plugins already carry a status; a
+    // client-side one describes the caller's own mistake and is safe to relay.
     const statusCode = error.statusCode ?? 500;
     if (statusCode < 500) {
-      void reply
+      return reply
         .status(statusCode)
-        .send(errorBody(statusCode, error.code ?? ErrorCode.Internal, error.message));
-      return;
+        .send(errorBody(statusCode, error.code ?? codeFromStatus(statusCode), error.message));
     }
 
     // Never echo an unexpected failure to the client: it may name internal
     // paths or dependencies. Log it server-side, return nothing specific.
     request.log.error({ err: error }, 'unhandled error while serving request');
-    void reply
+    return reply
       .status(500)
       .send(errorBody(500, ErrorCode.Internal, 'An unexpected error occurred.'));
   });

@@ -9,7 +9,10 @@ import type { FastifyInstance } from 'fastify';
 import type { Config } from '../../config';
 import { FileTooLargeError, NoFileUploadedError, UnsupportedMediaTypeError } from '../errors';
 
-/** Multipart field name the MP3 is expected under. */
+/**
+ * Field name used in the documentation and examples. The route accepts a file
+ * part under any name; this is what error messages suggest.
+ */
 export const FILE_FIELD_NAME = 'file';
 
 /** Successful response body. */
@@ -20,6 +23,8 @@ export interface FrameCountResponse {
 /** Registers the upload route on `app`. */
 export function registerFileUploadRoute(app: FastifyInstance, config: Config): void {
   app.post('/file-upload', async (request): Promise<FrameCountResponse> => {
+    // Reached only when the request carries no Content-Type: Fastify skips
+    // body parsing entirely, so the catch-all parser in `app.ts` never runs.
     if (!request.isMultipart()) {
       throw new UnsupportedMediaTypeError(request.headers['content-type']);
     }

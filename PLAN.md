@@ -35,7 +35,15 @@ like this list.
 5. **Error handling complete.** Every failure path returns the standard JSON
    error with a useful message; failure fixtures (truncated file, non-MP3).
    Zero frames found is an error, not a zero count.
-   Exit: failure-path tests green.
+   Known gaps carried in from step 1, both to be closed here:
+   - A 404 is rendered by Fastify's not-found handler, not the error handler,
+     so it lacks the `code` field every other error carries.
+   - Uploading two files trips the `files: 1` busboy limit, which destroys the
+     part stream and surfaces as `ERR_STREAM_PREMATURE_CLOSE` with no status —
+     reported as a 500 although the caller is at fault. Should be a 400.
+
+   Exit: failure-path tests green; no client mistake reports as 5xx.
+
 6. **Wrap-up.** README (clone → run → test in under two minutes, exact curl
    example), DECISIONS.md pass, future-work list, architecture + Q&A pages,
    clean-clone verification, git log review.

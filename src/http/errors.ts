@@ -33,8 +33,11 @@ export class NoFileUploadedError extends ApiError {
   readonly statusCode = 400;
   readonly code = ErrorCode.NoFileUploaded;
 
-  constructor(fieldName: string) {
-    super(`No file was uploaded. Send the MP3 as a multipart field named "${fieldName}".`);
+  /** @param exampleFieldName - suggested field name; any name is accepted. */
+  constructor(exampleFieldName: string) {
+    super(
+      `No file was uploaded. Attach the MP3 as a file part — any field name is accepted, for example "${exampleFieldName}".`,
+    );
   }
 }
 
