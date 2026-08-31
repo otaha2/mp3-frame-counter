@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Architecture</title>
+    <link rel="stylesheet" href="../assets/docs.css" />
+  </head>
+  <body>
+    <h1>Architecture</h1>
+    <p class="scope">
+      Covers the layering of the service and the path a request takes through it; informs everything
+      under <code>src/</code>.
+    </p>
+
+    <h2>Layers</h2>
+    <p>
+      Two layers with a one-way dependency. The domain never learns that HTTP exists, so it can be
+      unit-tested with byte arrays and reused outside a server.
+    </p>
+    <table>
+      <tr>
+        <th>Layer</th>
+        <th>Files</th>
+        <th>May import</th>
+      </tr>
+      <tr>
+        <td>Transport</td>
+        <td><code>src/http/</code>, <code>src/index.ts</code></td>
+        <td>Fastify, the domain, <code>src/config.ts</code></td>
+      </tr>
+      <tr>
+        <td>Domain</td>
+        <td><code>src/mp3/</code></td>
+        <td>Node builtins only — no framework, no npm package</td>
+      </tr>
+      <tr>
+        <td>Configuration</td>
+        <td><code>src/config.ts</code></td>
+        <td>Nothing; the only reader of <code>process.env</code></td>
+      </tr>
+    </table>
+
+    <h2>Request path</h2>
+    <figure>
+      <svg
+        viewBox="0 0 700 260"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="A multipart upload flows chunk by chunk through busboy into the counter, which returns a frame count; failures divert to one error handler"
+      >
+        <defs>
+          <marker id="head" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
+          </marker>
+        </defs>
+
+        <rect class="box" x="8" y="30" width="104" height="44" rx="4" />
+        <text x="24" y="57">client</text>
+
+        <rect class="box" x="160" y="30" width="150" height="44" rx="4" />
+        <text x="176" y="50">content-type</text>
+        <text x="176" y="66">parser</text>
+
+        <rect class="box" x="360" y="30" width="150" height="44" rx="4" />
+        <text x="376" y="50">route handler</text>
+        <text class="lbl" x="376" y="66">fileUpload.ts</text>
+
+        <rect class="box" x="556" y="30" width="132" height="44" rx="4" />
+        <rect class="hot" x="556" y="30" width="132" height="44" rx="4" />
+        <text x="572" y="50">counter</text>
+        <text class="lbl" x="572" y="66">src/mp3/</text>
+
+        <rect class="box" x="360" y="180" width="150" height="44" rx="4" />
+        <text x="376" y="200">error handler</text>
+        <text class="lbl" x="376" y="216">app.ts — the only one</text>
+
+        <!-- happy path -->
+        <path class="arrow" d="M114,52 L156,52" stroke="currentColor" />
+        <text class="lbl" x="112" y="24">POST multipart</text>
+        <path class="arrow" d="M312,52 L356,52" stroke="currentColor" />
+        <path class="arrow" d="M512,52 L552,52" stroke="currentColor" />
+        <text class="lbl" x="500" y="24">chunks</text>
+        <path class="arrow" d="M620,78 C 620,120 540,120 470,120" stroke="currentColor" />
+        <text class="lbl" x="480" y="140">frameCount</text>
+
+        <!-- error paths -->
+        <path class="arrow" d="M228,78 C 228,150 330,150 400,176" stroke="currentColor" />
+        <text class="lbl" x="150" y="130">415 not multipart</text>
+        <path class="arrow" d="M430,78 L432,176" stroke="currentColor" />
+        <text class="lbl" x="440" y="130">throws 400 / 413</text>
+        <path class="arrow" d="M356,202 C 200,202 120,140 90,80" stroke="currentColor" />
+        <text class="lbl" x="150" y="238">one JSON error shape</text>
+      </svg>
+      <figcaption>
+        Bytes are consumed chunk by chunk and never assembled into a whole-file buffer; every
+        failure, wherever it is raised, leaves through a single handler.
+      </figcaption>
+    </figure>
+
+    <h2>Why the upload streams</h2>
+    <p>
+      <code>@fastify/multipart</code> exposes each part as a readable stream with a byte limit
+      applied by busboy. The handler consumes that stream to completion and hands each chunk to the
+      counter; nothing accumulates. Memory therefore stays flat regardless of file size, and an
+      oversized upload is rejected at the limit rather than after buffering. The part stream
+      <em>must</em> be drained even when its bytes are not needed — busboy will not finish parsing
+      the request, and the response will not be sent, while a part stream is still pending.
+    </p>
+
+    <h2>Current state</h2>
+    <p>
+      Step 1 wires the whole path with the counter stubbed: the route drains the upload and returns
+      <code>{ "frameCount": 0 }</code>. Steps 2–4 fill in <code>src/mp3/</code> and replace the
+      stub; the response and error shapes do not change. Rationale for each choice is in
+      <code>DECISIONS.md</code>.
+    </p>
+  </body>
+</html>
