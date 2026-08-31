@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Counting frames</title>
+    <link rel="stylesheet" href="../assets/docs.css" />
+  </head>
+  <body>
+    <h1>Counting frames</h1>
+    <p class="scope">
+      Covers the rules that turn a byte stream into a frame count; informs
+      <code>src/mp3/countFrames.ts</code> and the streaming counter that replaces it.
+    </p>
+
+    <h2>The walk</h2>
+    <p>
+      Frames are located by arithmetic, not by searching. Each header declares its own length, so
+      the next header is expected exactly that many bytes later. Scanning happens only to recover
+      after that expectation fails, which makes the common case one read per frame rather than one
+      per byte.
+    </p>
+
+    <h2>Rules</h2>
+    <table>
+      <tr>
+        <th>Situation</th>
+        <th>Rule</th>
+        <th>Why</th>
+      </tr>
+      <tr>
+        <td>Leading ID3v2 tag</td>
+        <td>Skip <code>10 + syncsafe size</code> (plus 10 more if the footer flag is set)</td>
+        <td>Tag bodies contain arbitrary bytes, including 0xFF runs that scan as sync words</td>
+      </tr>
+      <tr>
+        <td>Trailing ID3v1 tag</td>
+        <td>Treat the file as ending 128 bytes early</td>
+        <td>The tag is not audio and must not be scanned as frames</td>
+      </tr>
+      <tr>
+        <td>First frame is Xing / Info / VBRI</td>
+        <td>Count it as structure, not audio</td>
+        <td>It carries encoder metadata, not sound — DECISIONS.md D1 and D11</td>
+      </tr>
+      <tr>
+        <td>Header invalid at the expected offset</td>
+        <td>Advance one byte and look again, marking the stream out of sync</td>
+        <td>A frame boundary can land anywhere after damage, so every offset is a candidate</td>
+      </tr>
+      <tr>
+        <td>Out of sync</td>
+        <td>Require a second header exactly one frame later before accepting the first</td>
+        <td>A lone sync word occurs readily in ordinary binary data; two that agree do not</td>
+      </tr>
+      <tr>
+        <td>Final frame runs past the end</td>
+        <td>Do not count it</td>
+        <td>Its audio is not in the file; counting it would overstate the content</td>
+      </tr>
+    </table>
+
+    <h2>Why one sync word is not enough</h2>
+    <p>
+      A header begins with eleven set bits, but that pattern appears often in compressed audio
+      payload and in unrelated binary files. Accepting it alone would report a frame count for a
+      JPEG. The counter therefore trusts a candidate only once a second header sits exactly where
+      the first one's declared length says it should — a coincidence that arbitrary data almost
+      never produces. Once the chain is established each link is trusted on its own, so the check
+      costs nothing on undamaged files.
+    </p>
+
+    <figure>
+      <svg
+        viewBox="0 0 700 200"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="A stream of frames interrupted by damage: the counter scans byte by byte and requires two agreeing headers before resuming"
+      >
+        <defs>
+          <marker id="head" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
+          </marker>
+        </defs>
+
+        <rect class="box" x="10" y="50" width="120" height="38" />
+        <text x="34" y="74">frame</text>
+        <rect class="box" x="130" y="50" width="120" height="38" />
+        <text x="154" y="74">frame</text>
+
+        <rect class="box" x="250" y="50" width="110" height="38" />
+        <text class="lbl" x="266" y="74">damage</text>
+
+        <rect class="box" x="360" y="50" width="120" height="38" />
+        <rect class="hot" x="360" y="50" width="120" height="38" />
+        <text x="384" y="74">frame</text>
+        <rect class="box" x="480" y="50" width="120" height="38" />
+        <rect class="hot" x="480" y="50" width="120" height="38" />
+        <text x="504" y="74">frame</text>
+
+        <path class="arrow" d="M28,48 C 60,20 100,20 146,46" stroke="currentColor" />
+        <text class="lbl" x="46" y="26">jump by declared length</text>
+
+        <path class="arrow" d="M258,92 L268,92" stroke="currentColor" />
+        <path class="arrow" d="M278,92 L288,92" stroke="currentColor" />
+        <path class="arrow" d="M298,92 L308,92" stroke="currentColor" />
+        <text class="lbl" x="238" y="112">scan one byte at a time</text>
+
+        <path class="arrow" d="M378,110 C 400,140 450,140 496,112" stroke="currentColor" />
+        <text class="lbl" x="366" y="158">accepted only because this second header agrees</text>
+      </svg>
+      <figcaption>
+        In sync, the counter jumps. Out of sync, it scans — and resumes only on two headers that
+        agree.
+      </figcaption>
+    </figure>
+
+    <p>
+      Measured counts for the sample and the generated fixtures are on the
+      <a href="../evidence/sample-ground-truth.html">ground-truth page</a>.
+    </p>
+  </body>
+</html>

@@ -156,6 +156,77 @@
       tile to byte 1,458,172 — the exact end of the file.
     </p>
 
+    <h2>Generated fixtures</h2>
+    <p>
+      Three short files produced with ffmpeg to cover shapes the sample does not: constant bitrate,
+      a single channel, a file with no tags or metadata frame at all, and an ID3v1 tail. Counts
+      recorded in <code>test/fixtures/expected-counts.json</code>.
+    </p>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Shape</th>
+        <th>Physical frames</th>
+        <th>mediainfo</th>
+        <th>ffprobe</th>
+        <th>Expected</th>
+      </tr>
+      <tr>
+        <td><code>cbr-128-stereo-bare.mp3</code></td>
+        <td>CBR 128 kbps stereo, no tags, no metadata frame</td>
+        <td>78</td>
+        <td>78</td>
+        <td>78</td>
+        <td>78</td>
+      </tr>
+      <tr>
+        <td><code>cbr-64-mono-info.mp3</code></td>
+        <td>CBR 64 kbps mono, ID3v2 + <code>Info</code> frame</td>
+        <td>79</td>
+        <td><mark>79</mark></td>
+        <td><mark>78</mark></td>
+        <td>78</td>
+      </tr>
+      <tr>
+        <td><code>cbr-192-stereo-id3v1.mp3</code></td>
+        <td>CBR 192 kbps stereo, 128-byte ID3v1 tail</td>
+        <td>116</td>
+        <td>116</td>
+        <td>116</td>
+        <td>116</td>
+      </tr>
+    </table>
+
+    <h2>The reference tools do not agree with each other</h2>
+    <p>
+      On <code>cbr-64-mono-info.mp3</code> mediainfo reports 79 and ffprobe reports 78. The file
+      holds 79 structurally valid frames, the first of which is an <code>Info</code> metadata frame
+      whose own frame-count field reads 78.
+    </p>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>Metadata frame</th>
+        <th>mediainfo behaviour</th>
+      </tr>
+      <tr>
+        <td><code>sample.mp3</code> (VBR)</td>
+        <td>Xing, field = 6089</td>
+        <td>Reports 6089 — the field's value, excluding the metadata frame</td>
+      </tr>
+      <tr>
+        <td><code>cbr-64-mono-info.mp3</code> (CBR)</td>
+        <td>Info, field = 78</td>
+        <td>Reports 79 — a physical count, including the metadata frame</td>
+      </tr>
+    </table>
+    <p>
+      mediainfo is therefore not self-consistent across the two files: it appears to read the
+      declared field for a variable-bitrate stream and to count frames itself for a constant one.
+      ffprobe excludes the metadata frame in both cases, as does each file's own header field. This
+      service follows the consistent reading — see DECISIONS.md D11.
+    </p>
+
     <h2>The discrepancy, resolved</h2>
     <p>
       Physical walk: <strong>6090</strong>. mediainfo, ffprobe, and the file's own Xing field:

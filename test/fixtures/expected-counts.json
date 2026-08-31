@@ -1,0 +1,48 @@
+{
+  "_source": "mediainfo 26.05 (MediaInfoLib v26.05) and ffprobe 9.0.1. Structural columns confirmed by byte inspection (od). GROUND TRUTH: never edit these numbers to make a test pass.",
+  "_reading": "expectedFrameCount is the value this API must return. Where mediainfo and ffprobe disagree, see DECISIONS.md D11 and docs/evidence/sample-ground-truth.html.",
+  "files": {
+    "sample.mp3": {
+      "expectedFrameCount": 6089,
+      "physicalFrames": 6090,
+      "metadataFrame": "Xing",
+      "metadataFrameCountField": 6089,
+      "id3v2Bytes": 44,
+      "id3v1": false,
+      "mediainfoFrameCount": 6089,
+      "ffprobeReadFrames": 6089,
+      "notes": "VBR, joint stereo, 44100 Hz, LAME3.100. Both tools agree."
+    },
+    "cbr-128-stereo-bare.mp3": {
+      "expectedFrameCount": 78,
+      "physicalFrames": 78,
+      "metadataFrame": null,
+      "id3v2Bytes": 0,
+      "id3v1": false,
+      "mediainfoFrameCount": 78,
+      "ffprobeReadFrames": 78,
+      "notes": "No tags and no VBR header: the file is nothing but frames. Both tools agree."
+    },
+    "cbr-64-mono-info.mp3": {
+      "expectedFrameCount": 78,
+      "physicalFrames": 79,
+      "metadataFrame": "Info",
+      "metadataFrameCountField": 78,
+      "id3v2Bytes": 44,
+      "id3v1": false,
+      "mediainfoFrameCount": 79,
+      "ffprobeReadFrames": 78,
+      "notes": "TOOLS DISAGREE. mediainfo counts the Info metadata frame as audio; ffprobe and the Info header's own frame-count field both say 78. Mono, so the Info marker sits 21 bytes into the frame rather than 36."
+    },
+    "cbr-192-stereo-id3v1.mp3": {
+      "expectedFrameCount": 116,
+      "physicalFrames": 116,
+      "metadataFrame": null,
+      "id3v2Bytes": 0,
+      "id3v1": true,
+      "mediainfoFrameCount": 116,
+      "ffprobeReadFrames": 116,
+      "notes": "128-byte ID3v1 tail appended by hand; mediainfo reads its title, confirming the tag is well formed. Both tools agree."
+    }
+  }
+}
