@@ -5,7 +5,15 @@
  * a `Config` so that tests can construct an app without mutating globals.
  */
 
-/** Default cap on a single uploaded file. Large enough for a long album track. */
+/**
+ * Default cap on a single uploaded file: 200 MiB, i.e. 209,715,200 bytes or
+ * roughly 0.2 GB — about 3.5 hours of 128 kbps audio.
+ *
+ * This is a policy limit, not a memory ceiling. The upload is consumed as a
+ * stream, so memory stays flat whatever the file size; the cap exists to bound
+ * how long one request may hold a connection, and to refuse a client early
+ * rather than after it has sent gigabytes.
+ */
 const DEFAULT_MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = '0.0.0.0';

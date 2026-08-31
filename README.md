@@ -69,11 +69,11 @@ Accepts `multipart/form-data` with the MP3 in a field named `file`.
 
 ## Configuration
 
-| Variable           | Default              | Meaning                                 |
-| ------------------ | -------------------- | --------------------------------------- |
-| `PORT`             | `3000`               | Listen port                             |
-| `HOST`             | `0.0.0.0`            | Listen address                          |
-| `MAX_UPLOAD_BYTES` | `209715200` (200 MB) | Rejected beyond this, without buffering |
+| Variable           | Default               | Meaning                                 |
+| ------------------ | --------------------- | --------------------------------------- |
+| `PORT`             | `3000`                | Listen port                             |
+| `HOST`             | `0.0.0.0`             | Listen address                          |
+| `MAX_UPLOAD_BYTES` | `209715200` (200 MiB) | Rejected beyond this, without buffering |
 
 ## Further reading
 
