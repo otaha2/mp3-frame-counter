@@ -143,7 +143,18 @@
           — genuine VBR
         </td>
       </tr>
+      <tr>
+        <th>Channel-mode split</th>
+        <td>
+          1 stereo + <mark>6089</mark> joint stereo. The lone stereo frame is the Xing frame at
+          offset 44; every audio frame is joint stereo, matching mediainfo's report.
+        </td>
+      </tr>
     </table>
+    <p>
+      Re-run with <code>src/mp3/frameHeader.ts</code> after step 2: identical totals, and the frames
+      tile to byte 1,458,172 — the exact end of the file.
+    </p>
 
     <h2>The discrepancy, resolved</h2>
     <p>
@@ -151,9 +162,11 @@
       <strong>6089</strong>. The difference is exactly frame 1 — the Xing metadata frame, which is a
       validly-shaped frame carrying no audio. Reference tools exclude it; the Xing field's byte
       count (which <em>includes</em>
-      its own frame) confirms the count field describes the frames after it. Decision: report
-      6089-style counts — physical frames minus a detected Xing/Info/VBRI frame (DECISIONS.md D1).
-      Expected count for this file:
+      its own frame) confirms the count field describes the frames after it. The channel-mode split
+      is a fourth, independent witness to the same boundary: the metadata frame declares stereo
+      while all 6089 audio frames declare joint stereo. Decision: report 6089-style counts —
+      physical frames minus a detected Xing/Info/VBRI frame (DECISIONS.md D1). Expected count for
+      this file:
       <mark>6089</mark>.
     </p>
   </body>
