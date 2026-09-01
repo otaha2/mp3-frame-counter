@@ -143,3 +143,31 @@ svg .arrow {
   fill: none;
   marker-end: url(#head);
 }
+
+/* Collapsible question-and-answer entries. */
+details {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.6rem 0.9rem;
+  margin: 0.6rem 0;
+  background: var(--bg);
+}
+details[open] {
+  background: var(--code-bg);
+}
+summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+details > p {
+  margin-bottom: 0;
+}
+details > p:first-of-type {
+  margin-top: 0.75rem;
+}
+
+/* A question hides its options; the answer inside hides one level further. */
+details details {
+  background: var(--bg);
+  margin-top: 0.75rem;
+}

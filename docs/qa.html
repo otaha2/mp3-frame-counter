@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Questions and answers</title>
+    <link rel="stylesheet" href="assets/docs.css" />
+  </head>
+  <body>
+    <h1>Questions and answers</h1>
+    <p class="scope">
+      A guided path through how this service counts frames: the idea it rests on, the cases that
+      complicate it, and how the numbers were checked.
+    </p>
+
+    <h2>Why this page exists</h2>
+    <p>
+      It was written while learning the format, not afterwards. The questions above are the ones
+      that actually blocked progress, in the order they blocked it, and the answers are what
+      unblocked them — which is why several are about tools disagreeing rather than about code.
+      Keeping them turns a private struggle into something reusable.
+    </p>
+    <p>
+      Two kinds of reader are expected. Someone who only wants to know what the service does can
+      stop after the first three answers and be correctly informed. Someone about to change the code
+      should follow the links: each answer is deliberately one screen, with the depth kept in the
+      <a href="index.html">knowledge log</a> and the reasoning in
+      <a href="decisions.md">decisions.md</a>, so the choice of how far to go stays with the reader
+      rather than being made for them.
+    </p>
+
+    <h2>How it works</h2>
+
+    <details id="counting" open>
+      <summary>How are the frames counted?</summary>
+      <p>
+        An MP3 is a sequence of frames, and every frame opens with a four-byte header that declares
+        the bitrate and sampling rate it was encoded at. Those two numbers give the frame's length
+        in bytes. Counting is therefore a walk rather than a search: read a header, step forward by
+        exactly that many bytes, and the next header is waiting there. The audio itself is never
+        decoded or even examined — only the headers are read.
+      </p>
+      <p><a href="concepts/mp3-structure.html">The file format, field by field →</a></p>
+    </details>
+
+    <details id="lengths">
+      <summary>Where does one frame end and the next begin?</summary>
+      <p>
+        The header alone decides it:
+        <code>length = floor(144 × bitrate ÷ sampleRate) + padding</code>. A frame always carries
+        1152 samples, so its size follows from how fast it was encoded; 144 is 1152 samples divided
+        by 8 bits per byte. The padding bit adds a single byte, which is how an encoder absorbs the
+        remainder when that division is not exact. On the provided sample this walk lands on a valid
+        header 6090 times in a row and finishes on the file's last byte, with nothing left over.
+      </p>
+      <p><a href="concepts/frame-counting.html">The counting rules →</a></p>
+    </details>
+
+    <details id="metadata">
+      <summary>An MP3 carries metadata at both ends. Is any of it counted?</summary>
+      <p>
+        None of it, and each kind is excluded differently. An ID3v2 tag sits at the front and
+        declares its own size, so it is skipped by arithmetic — that size field is stored seven bits
+        per byte precisely so nothing inside a tag can be mistaken for a frame header. An ID3v1 tag
+        is exactly 128 bytes at the very end, so the last 128 bytes are held back until the stream
+        finishes and only then examined. A third kind hides in plain sight: the first frame may be a
+        Xing or Info frame, structurally a real frame but carrying encoder statistics instead of
+        sound. It counts as structure rather than audio, which is the difference between the 6090
+        frames in the sample and the 6089 reported for it.
+      </p>
+      <p><a href="evidence/sample-ground-truth.html">The sample, byte by byte →</a></p>
+    </details>
+
+    <details id="damage">
+      <summary>What happens to a damaged file, or one that is not an MP3 at all?</summary>
+      <p>
+        When a header is not where the previous frame said it would be, the counter moves forward
+        one byte at a time until it finds one. Trust is then re-established only by two headers, not
+        one: a candidate is believed when a second header sits exactly one frame length further on.
+        A single plausible header proves little, because eleven consecutive 1-bits occur readily
+        inside compressed audio and inside unrelated files — without that second opinion a
+        photograph would appear to contain frames. A file with no frames at all is answered with a
+        400 naming the format that is supported, rather than a cheerful count of zero.
+      </p>
+      <p><a href="concepts/frame-counting.html">Why one sync word is not enough →</a></p>
+    </details>
+
+    <details id="streaming">
+      <summary>Why is the upload counted as it arrives instead of being read first?</summary>
+      <p>
+        Because nothing about counting needs the whole file. A frame is decided entirely by its own
+        four-byte header, so the reader carries a fixed amount of state — a partial header split
+        across two chunks, and how far it is into the current frame — and discards everything else
+        as it goes. Streaming 208 MB through one counter grows the heap by 3.9 MB, and a 146 MB
+        upload is answered in about seven tenths of a second with the server's memory essentially
+        unchanged. The configured size limit therefore bounds how large a request may be, not how
+        much memory one costs.
+      </p>
+      <p><a href="model/architecture.html">The buffered and streaming designs compared →</a></p>
+    </details>
+
+    <details id="verification">
+      <summary>How is the count known to be correct?</summary>
+      <p>
+        Every count is checked against tools written by other people.
+        <code>mediainfo</code> and <code>ffprobe</code> both report 6089 for the provided sample,
+        and the file's own Xing header declares 6089 as well. Three short files were generated with
+        ffmpeg to cover shapes the sample does not — constant bitrate, a single channel, an ID3v1
+        tail — and their counts live in <code>test/fixtures/expected-counts.json</code>, which is
+        treated as ground truth and never edited to make a test pass. A fourth witness appeared by
+        accident: of the 6090 frames in the sample, exactly one declares stereo and 6089 declare
+        joint stereo, and the odd one out is the metadata frame.
+      </p>
+      <p><a href="evidence/sample-ground-truth.html">Every measurement taken →</a></p>
+    </details>
+
+    <details id="disagreement">
+      <summary>Why does this count differ from mediainfo on one of the files?</summary>
+      <p>
+        On a constant-bitrate fixture <code>mediainfo</code> reports 79 while
+        <code>ffprobe</code> reports 78. The file holds 79 structurally valid frames, the first of
+        which is an Info metadata frame whose own count field reads 78. The two tools are not
+        measuring the same thing: for a variable-bitrate file <code>mediainfo</code> appears to
+        repeat the count declared in the header, while for a constant-bitrate one it counts frames
+        itself — so its answers are not consistent with each other across the two files.
+      </p>
+      <p>
+        A truncated file makes the difference plain. Cut the sample to 20000 bytes and
+        <code>mediainfo</code> still reports 6089, a number describing a file that no longer exists,
+        while <code>ffprobe</code> reports 96, counting a final frame missing 234 of its 261 bytes.
+        This service reports 95: the frames whose bytes are all present, less the metadata frame.
+        Matching the tool that contradicts itself would make the answer depend on how the file
+        happened to be encoded.
+      </p>
+      <p><a href="decisions.md">The decision, with the alternatives →</a></p>
+    </details>
+
+    <details id="scope">
+      <summary>What is deliberately not handled?</summary>
+      <p>
+        MPEG Version 2 and 2.5 and Layers I and II are out of scope, and are rejected with a message
+        naming the format that is supported — handled deliberately rather than by accident.
+        Free-format files are rejected for a sharper reason: they do not declare a bitrate, so a
+        frame's length cannot be derived from its own header and the jump-by-length approach does
+        not apply to them at all. A request carrying more than one file is not supported either: the
+        first file is read, and the only promise made is that a caller's mistake is never reported
+        as a server error. Each of these is named in the README alongside what happens instead.
+      </p>
+      <p><a href="decisions.md">Every decision, with what else was considered →</a></p>
+    </details>
+
+    <h2>Check yourself</h2>
+    <p>
+      Eight questions to work through before changing anything. Choose an answer, then open the
+      panel: each one links back to the full explanation above.
+    </p>
+
+    <details>
+      <summary>1. Why can frames be counted without decoding any audio?</summary>
+      <ol type="a">
+        <li>The first header in the file records how many frames follow it.</li>
+        <li>Every frame is the same size, so it is the file size divided by that size.</li>
+        <li>Each frame's header gives its bitrate and sampling rate, and those fix its length.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>c</strong> — and because that length is known, the next header sits at a computed
+          offset instead of one that has to be searched for.
+        </p>
+        <p><a href="#counting">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>2. Why is an ID3v2 tag's size stored using only seven bits of each byte?</summary>
+      <ol type="a">
+        <li>To keep tags below a maximum size.</li>
+        <li>
+          So that no byte inside the tag can carry the eleven set bits of a frame's sync word.
+        </li>
+        <li>For compatibility with older text encodings.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>b</strong> — that is its only purpose, which is why a tag can hold arbitrary bytes
+          — album art included — without ever looking like audio.
+        </p>
+        <p><a href="#metadata">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>
+        3. The sample holds 6090 structurally valid frames and the answer is 6089. Which one is left
+        out?
+      </summary>
+      <ol type="a">
+        <li>The last, because its bytes are incomplete.</li>
+        <li>A corrupted frame somewhere in the middle.</li>
+        <li>The first, which carries encoder statistics instead of sound.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>c</strong> — a Xing frame, whose own count field reads 6089 and which is the only
+          frame in the file declaring stereo rather than joint stereo.
+        </p>
+        <p><a href="#metadata">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>
+        4. While the upload is still arriving, why are the last 128 bytes held back?
+      </summary>
+      <ol type="a">
+        <li>To leave room for a checksum.</li>
+        <li>
+          Because an ID3v1 tag is exactly that long, and a byte cannot be known to be in the final
+          128 until the stream stops.
+        </li>
+        <li>To align reads onto a block boundary.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>b</strong> — so the counter stays deliberately 128 bytes behind, and decides what
+          those bytes were once the upload ends.
+        </p>
+        <p><a href="#metadata">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>
+        5. After damage, why is a single valid-looking header not enough to resume counting?
+      </summary>
+      <ol type="a">
+        <li>The specification requires headers to appear in pairs.</li>
+        <li>The first header after damage is always corrupt.</li>
+        <li>
+          Eleven consecutive 1-bits occur by chance in ordinary data, so a second header at the
+          declared distance is needed to confirm it.
+        </li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>c</strong> — two accidents agreeing to the byte are vanishingly unlikely, while
+          one on its own is common enough that a photograph would appear to contain frames.
+        </p>
+        <p><a href="#damage">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>
+        6. mediainfo reports 6089 frames for a file truncated to 20000 bytes. What does that reveal?
+      </summary>
+      <ol type="a">
+        <li>The truncation happened to remove no frames.</li>
+        <li>The number came from the Xing header's declared field rather than from counting.</li>
+        <li>mediainfo repaired the file before counting it.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>b</strong> — only 96 frames remain in the file, so 6089 describes the file as it
+          was before it was cut.
+        </p>
+        <p><a href="#disagreement">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>7. What is the most of a file the counter ever holds at one time?</summary>
+      <ol type="a">
+        <li>Roughly one frame plus 128 bytes.</li>
+        <li>One chunk, whatever size the network delivered.</li>
+        <li>The whole file, briefly, before releasing it.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>a</strong> — one frame while sync is being confirmed, plus the 128 withheld for a
+          possible tag; the bytes of a frame in progress are discarded as they pass.
+        </p>
+        <p><a href="#streaming">Full explanation →</a></p>
+      </details>
+    </details>
+
+    <details>
+      <summary>
+        8. Free-format files declare no bitrate. Why does that defeat this approach in particular?
+      </summary>
+      <ol type="a">
+        <li>They use a different sync word.</li>
+        <li>Without a bitrate there is no length, so there is no next offset to jump to.</li>
+        <li>They only occur in MPEG Version 2.</li>
+      </ol>
+      <details>
+        <summary>Answer</summary>
+        <p>
+          <strong>b</strong> — counting them would mean scanning for each following sync word, which
+          is a different strategy rather than a small adjustment.
+        </p>
+        <p><a href="#scope">Full explanation →</a></p>
+      </details>
+    </details>
+  </body>
+</html>
