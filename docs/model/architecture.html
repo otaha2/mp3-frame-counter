@@ -164,9 +164,9 @@
       so nothing earlier in the file is needed and a frame spanning several chunks is skipped by
       arithmetic rather than assembled. What survives between chunks is fixed in size: a header
       split across a boundary, how far into the current frame the reader is, and the trailing 128
-      bytes that may turn out to be an ID3v1 tag. Peak memory stays under 4 MB whether 104 MB or 417
-      MB is pushed through it, and eight simultaneous 146 MB uploads — over a gigabyte in flight —
-      never took the server past 99 MB. See
+      bytes that may turn out to be an ID3v1 tag. Counting 417 MB peaks at 13.9 MB where buffering
+      the same input needs 425 MB, and eight simultaneous 146 MB uploads — over a gigabyte in flight
+      — never took the server past 99 MB. See
       <a href="../evidence/streaming-memory.html">the measurements</a>.
     </p>
 

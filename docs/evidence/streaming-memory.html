@@ -56,10 +56,11 @@
 
     <h2>Memory does not grow with the stream</h2>
     <p>
-      The same input pushed through both counter designs, in 64 KB chunks, on the same machine. Node
-      keeps Buffers outside the V8 heap, so <code>heapUsed</code> alone would miss exactly the
-      allocation that separates the two designs; the figures below are
-      <code>heapUsed + arrayBuffers</code>, sampled every 5 ms with <code>--expose-gc</code>.
+      The same input fed to both counter designs, in 64 KB chunks, on the same machine. Node keeps
+      Buffers outside the V8 heap, so <code>heapUsed</code> alone would miss exactly the allocation
+      that separates them; the figures below are <code>heapUsed + arrayBuffers</code>, sampled every
+      5 ms, each the middle of three runs. <code>npm run bench</code> reproduces this table and the
+      one above.
     </p>
     <table>
       <tr>
@@ -69,25 +70,26 @@
       </tr>
       <tr>
         <td>104.3 MB</td>
-        <td>107.3 MB</td>
-        <td><mark>3.7 MB</mark></td>
+        <td>108.4 MB</td>
+        <td><mark>2.2 MB</mark></td>
       </tr>
       <tr>
         <td>208.6 MB</td>
-        <td>211.3 MB</td>
-        <td><mark>2.4 MB</mark></td>
+        <td>212.7 MB</td>
+        <td><mark>4.9 MB</mark></td>
       </tr>
       <tr>
         <td>417.2 MB</td>
-        <td>420.8 MB</td>
-        <td><mark>3.2 MB</mark></td>
+        <td>425.5 MB</td>
+        <td><mark>13.9 MB</mark></td>
       </tr>
     </table>
     <p>
-      The buffered counter tracks the input almost exactly, since holding the file <em>is</em> what
-      it does. Quadrupling the input leaves the streaming counter where it was — the variation
-      between 2.4 and 3.7 MB is garbage collection timing, not a trend. Both return identical counts
-      throughout.
+      The buffered counter needs slightly more than the input, because holding the file <em>is</em>
+      what it does. The streaming counter never exceeds a few per cent of it. What that counter
+      actually retains is about a kilobyte — a partial header, a position, and 128 withheld bytes —
+      so the megabytes that do appear are arriving chunks waiting to be collected rather than
+      anything it is keeping. Both designs return identical counts throughout.
     </p>
     <p>
       The streaming counter retains only what it cannot yet decide: at most one frame while it is

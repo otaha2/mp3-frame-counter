@@ -93,11 +93,11 @@
         Because nothing about counting needs the whole file. A frame is decided entirely by its own
         four-byte header, so the reader carries a fixed amount of state — a partial header split
         across two chunks, and how far it is into the current frame — and discards everything else
-        as it goes. Peak memory stays under 4 MB whether 104 MB or 417 MB is counted, where the
-        earlier design that buffered the file needed room for all of it. The same holds across
-        requests: eight simultaneous 146 MB uploads put over a gigabyte in flight and never took the
-        server past 99 MB. The configured size limit therefore bounds how large a request may be,
-        not how much memory one costs.
+        as it goes. Counting 417 MB peaks at 13.9 MB, where the earlier design that buffered the
+        file needed 425 MB for the same input. The same holds across requests: eight simultaneous
+        146 MB uploads put over a gigabyte in flight and never took the server past 99 MB. The
+        configured size limit therefore bounds how large a request may be, not how much memory one
+        costs.
       </p>
       <p><a href="model/architecture.html">The buffered and streaming designs compared →</a></p>
     </details>
