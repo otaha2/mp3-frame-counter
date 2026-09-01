@@ -47,7 +47,7 @@
         viewBox="0 0 700 260"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
-        aria-label="A multipart upload flows chunk by chunk through busboy into the counter, which returns a frame count; failures divert to one error handler"
+        aria-label="An upload flows chunk by chunk through the body parser into the counter, which returns a frame count; failures raised in the route divert to one error handler"
       >
         <defs>
           <marker id="head" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
@@ -59,8 +59,8 @@
         <text x="24" y="57">client</text>
 
         <rect class="box" x="160" y="30" width="150" height="44" rx="4" />
-        <text x="176" y="50">content-type</text>
-        <text x="176" y="66">parser</text>
+        <text x="176" y="50">body parser</text>
+        <text class="lbl" x="176" y="66">hands bytes through</text>
 
         <rect class="box" x="360" y="30" width="150" height="44" rx="4" />
         <text x="376" y="50">route handler</text>
@@ -77,18 +77,16 @@
 
         <!-- happy path -->
         <path class="arrow" d="M114,52 L156,52" stroke="currentColor" />
-        <text class="lbl" x="112" y="24">POST multipart</text>
+        <text class="lbl" x="94" y="24">POST multipart or raw body</text>
         <path class="arrow" d="M312,52 L356,52" stroke="currentColor" />
         <path class="arrow" d="M512,52 L552,52" stroke="currentColor" />
         <text class="lbl" x="500" y="24">chunks</text>
         <path class="arrow" d="M620,78 C 620,120 540,120 470,120" stroke="currentColor" />
-        <text class="lbl" x="480" y="140">frameCount</text>
+        <text class="lbl" x="560" y="140">frameCount</text>
 
-        <!-- error paths -->
-        <path class="arrow" d="M228,78 C 228,150 330,150 400,176" stroke="currentColor" />
-        <text class="lbl" x="150" y="130">415 not multipart</text>
+        <!-- error path -->
         <path class="arrow" d="M430,78 L432,176" stroke="currentColor" />
-        <text class="lbl" x="440" y="130">throws 400 / 413</text>
+        <text class="lbl" x="440" y="132">throws 400 / 413</text>
         <path class="arrow" d="M356,202 C 200,202 120,140 90,80" stroke="currentColor" />
         <text class="lbl" x="150" y="238">one JSON error shape</text>
       </svg>
@@ -100,11 +98,12 @@
 
     <h2>How the upload is read</h2>
     <p>
-      <code>@fastify/multipart</code> exposes each part as a readable stream with a byte limit
-      applied by busboy, so an oversized upload is refused at the limit rather than after the whole
-      body has been received. The part stream <em>must</em> be read to the end even when its bytes
-      are not needed: busboy will not finish parsing the request, and the response will not be sent,
-      while a part stream is still pending.
+      A multipart upload reaches the route as a readable stream of parts, with a byte limit applied
+      by busboy so an oversized file is refused at the limit rather than after the whole body has
+      arrived. A part <em>must</em> be read to its end even when its bytes are not needed: busboy
+      will not finish parsing the request, and the response will not be sent, while a part stream is
+      still pending. A raw body is left unparsed and read straight from the request instead, with
+      the same limit applied as its bytes are counted.
     </p>
     <p>
       What happens to those chunks is the difference between the two counter designs below. Both
@@ -122,85 +121,90 @@
       the rules rather than two that can drift.
     </p>
 
+    <figure>
+      <svg
+        viewBox="0 0 700 150"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="Every chunk is accumulated into one buffer holding the whole file, counted in a single pass once the upload ends"
+      >
+        <defs>
+          <marker id="v1Arrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
+          </marker>
+        </defs>
+
+        <rect class="box" x="10" y="14" width="52" height="30" />
+        <text class="lbl" x="22" y="34">chunk</text>
+        <rect class="box" x="70" y="14" width="52" height="30" />
+        <text class="lbl" x="82" y="34">chunk</text>
+        <rect class="box" x="130" y="14" width="52" height="30" />
+        <text class="lbl" x="142" y="34">chunk</text>
+        <text class="lbl" x="190" y="34">…</text>
+
+        <path d="M36,46 L36,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
+        <path d="M96,46 L60,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
+        <path d="M156,46 L84,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
+
+        <rect class="box" x="10" y="74" width="440" height="34" />
+        <text class="lbl" x="24" y="96">one buffer holding the entire file</text>
+        <path d="M456,91 L500,91" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
+        <rect class="box" x="506" y="74" width="120" height="34" />
+        <rect class="hot" x="506" y="74" width="120" height="34" />
+        <text class="lbl" x="520" y="96">count once</text>
+
+        <text class="lbl" x="10" y="132">nothing is counted until the last byte arrives</text>
+      </svg>
+      <figcaption>Held: the whole upload, up to <code>MAX_UPLOAD_BYTES</code>.</figcaption>
+    </figure>
+
     <h2>v2 — streaming counter (current)</h2>
     <p>
-      Each chunk is counted as it arrives. Only a few bytes survive between chunks: a partial header
-      split across a boundary, and how far into the current frame the reader is. A frame is decided
-      entirely by its own four-byte header, so nothing earlier in the file is needed to decide the
-      next step, and a frame that spans chunks is skipped by arithmetic rather than by being
-      assembled. Measured across 208.6 MB of input, heap growth was 3.9 MB; a 146 MB upload through
-      the running server moved resident memory by under 3 MB. See
+      Each chunk is counted as it arrives. A frame is decided entirely by its own four-byte header,
+      so nothing earlier in the file is needed and a frame spanning several chunks is skipped by
+      arithmetic rather than assembled. What survives between chunks is fixed in size: a header
+      split across a boundary, how far into the current frame the reader is, and the trailing 128
+      bytes that may turn out to be an ID3v1 tag. Measured across 208.6 MB of input, heap growth was
+      3.9 MB; a 146 MB upload through the running server moved resident memory by under 3 MB. See
       <a href="../evidence/streaming-memory.html">the measurements</a>.
     </p>
 
     <figure>
       <svg
-        viewBox="0 0 700 330"
+        viewBox="0 0 700 150"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
-        aria-label="v1 accumulates every chunk into a whole-file buffer before counting; v2 counts each chunk on arrival and keeps only a few bytes of carried-over state"
+        aria-label="Each chunk is counted as it arrives, leaving only a partial header, a position within the current frame, and 128 withheld bytes"
       >
         <defs>
-          <marker id="head2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <marker id="v2Arrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
           </marker>
         </defs>
 
-        <text class="lbl" x="10" y="18">v1 — collect, then count</text>
-        <rect class="box" x="10" y="30" width="52" height="30" />
-        <text class="lbl" x="22" y="50">chunk</text>
-        <rect class="box" x="70" y="30" width="52" height="30" />
-        <text class="lbl" x="82" y="50">chunk</text>
-        <rect class="box" x="130" y="30" width="52" height="30" />
-        <text class="lbl" x="142" y="50">chunk</text>
-        <text class="lbl" x="190" y="50">…</text>
+        <rect class="box" x="10" y="14" width="52" height="30" />
+        <text class="lbl" x="22" y="34">chunk</text>
+        <rect class="box" x="70" y="14" width="52" height="30" />
+        <text class="lbl" x="82" y="34">chunk</text>
+        <rect class="box" x="130" y="14" width="52" height="30" />
+        <text class="lbl" x="142" y="34">chunk</text>
+        <text class="lbl" x="190" y="34">…</text>
 
-        <path d="M36,62 L36,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-        <path d="M96,62 L60,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-        <path d="M156,62 L84,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <path d="M62,29 L68,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
+        <path d="M122,29 L128,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
+        <path d="M210,29 L250,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
 
-        <rect class="box" x="10" y="90" width="440" height="34" />
-        <text class="lbl" x="24" y="112">one buffer holding the entire file</text>
-        <path d="M456,107 L500,107" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-        <rect class="box" x="506" y="90" width="120" height="34" />
-        <rect class="hot" x="506" y="90" width="120" height="34" />
-        <text class="lbl" x="520" y="112">count once</text>
-        <text class="lbl" x="10" y="142">
-          peak memory grows with the file, up to MAX_UPLOAD_BYTES
-        </text>
+        <rect class="box" x="256" y="12" width="150" height="34" />
+        <rect class="hot" x="256" y="12" width="150" height="34" />
+        <text class="lbl" x="268" y="34">count on arrival</text>
 
-        <line x1="10" y1="165" x2="690" y2="165" stroke="currentColor" opacity="0.25" />
+        <path d="M331,48 L331,74" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
+        <rect class="box" x="206" y="78" width="250" height="34" />
+        <text class="lbl" x="218" y="99">carried over: header, offset, 128 bytes</text>
 
-        <text class="lbl" x="10" y="196">v2 — count as it arrives</text>
-        <rect class="box" x="10" y="208" width="52" height="30" />
-        <text class="lbl" x="22" y="228">chunk</text>
-        <rect class="box" x="70" y="208" width="52" height="30" />
-        <text class="lbl" x="82" y="228">chunk</text>
-        <rect class="box" x="130" y="208" width="52" height="30" />
-        <text class="lbl" x="142" y="228">chunk</text>
-        <text class="lbl" x="190" y="228">…</text>
-
-        <path d="M62,223 L68,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-        <path d="M122,223 L128,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-
-        <path d="M210,223 L250,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
-        <rect class="box" x="256" y="206" width="150" height="34" />
-        <rect class="hot" x="256" y="206" width="150" height="34" />
-        <text class="lbl" x="268" y="228">count on arrival</text>
-
-        <path
-          d="M331,242 C 331,270 331,270 331,276"
-          stroke="currentColor"
-          fill="none"
-          marker-end="url(#head2)"
-        />
-        <rect class="box" x="240" y="280" width="182" height="30" />
-        <text class="lbl" x="252" y="300">carried over: &lt; 4 bytes + offset</text>
-        <text class="lbl" x="440" y="300">peak memory is constant</text>
+        <text class="lbl" x="10" y="132">the count is current at every moment</text>
       </svg>
-      <figcaption>
-        The counting rules are identical; only the amount of the file held at once differs.
-      </figcaption>
+      <figcaption>Held: about a kilobyte, whatever the size of the file.</figcaption>
     </figure>
 
     <table>
