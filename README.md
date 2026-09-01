@@ -133,6 +133,11 @@ Given more time, in the order I would take them:
   before replying, since answering early resets a client that is still sending.
 - **Support free-format files** by measuring each frame to the next sync word,
   which needs a different strategy from the current one.
+- **Limit how many uploads run at once.** Memory per request is flat, but
+  nothing caps concurrency; counting is CPU-bound and single-threaded, so past
+  roughly 800 MB/s of aggregate throughput further requests add latency rather
+  than throughput. A queue or connection limit would make that degradation
+  orderly rather than uniform.
 - **Bound the resynchronisation scan.** A large non-MP3 file is currently
   scanned byte by byte before being rejected; giving up after a few hundred
   kilobytes without a frame would refuse junk sooner.

@@ -257,7 +257,8 @@
       </tr>
     </table>
     <p>
-      Measured: 208 MB of audio pushed through one counter grew the heap by 3.9 MB. The
+      Measured: quadrupling the input from 104 MB to 417 MB leaves peak memory under 4 MB either
+      way, while the design that buffered the file needed room for all of it. The
       <a href="../evidence/streaming-memory.html">measurements page</a> has the figures, and
       <a href="frame-counting.html">the counting rules</a> covers what makes a frame valid in the
       first place.

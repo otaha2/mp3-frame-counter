@@ -56,28 +56,44 @@
 
     <h2>Memory does not grow with the stream</h2>
     <p>
-      208.6 MB pushed through a single counter in 64 KB chunks, heap sampled with
-      <code>--expose-gc</code>:
+      The same input pushed through both counter designs, in 64 KB chunks, on the same machine. Node
+      keeps Buffers outside the V8 heap, so <code>heapUsed</code> alone would miss exactly the
+      allocation that separates the two designs; the figures below are
+      <code>heapUsed + arrayBuffers</code>, sampled every 5 ms with <code>--expose-gc</code>.
     </p>
     <table>
       <tr>
-        <th>Heap before</th>
-        <td>6.9 MB</td>
+        <th>Input</th>
+        <th>v1 buffered — peak growth</th>
+        <th>v2 streaming — peak growth</th>
       </tr>
       <tr>
-        <th>Heap peak</th>
-        <td>10.8 MB</td>
+        <td>104.3 MB</td>
+        <td>107.3 MB</td>
+        <td><mark>3.7 MB</mark></td>
       </tr>
       <tr>
-        <th>Growth</th>
-        <td><mark>3.9 MB</mark> over 208.6 MB of input</td>
+        <td>208.6 MB</td>
+        <td>211.3 MB</td>
+        <td><mark>2.4 MB</mark></td>
+      </tr>
+      <tr>
+        <td>417.2 MB</td>
+        <td>420.8 MB</td>
+        <td><mark>3.2 MB</mark></td>
       </tr>
     </table>
     <p>
-      The counter retains only what it cannot yet decide: at most one frame while it is looking for
-      the start of the stream, and the trailing 128 bytes that may prove to be an ID3v1 tag. The
-      largest MPEG-1 Layer III frame is 1045 bytes, so the ceiling is on the order of a kilobyte
-      whatever the file size.
+      The buffered counter tracks the input almost exactly, since holding the file <em>is</em> what
+      it does. Quadrupling the input leaves the streaming counter where it was — the variation
+      between 2.4 and 3.7 MB is garbage collection timing, not a trend. Both return identical counts
+      throughout.
+    </p>
+    <p>
+      The streaming counter retains only what it cannot yet decide: at most one frame while it is
+      looking for the start of the stream, and the trailing 128 bytes that may prove to be an ID3v1
+      tag. The largest MPEG-1 Layer III frame is 1045 bytes, so the ceiling is on the order of a
+      kilobyte whatever the file size.
     </p>
 
     <h2>The same holds through the HTTP layer</h2>
@@ -137,6 +153,59 @@
       Neither request stalled and the server answered a normal upload immediately afterwards, which
       is the failure mode worth checking: rejecting a request part-way through its body leaves the
       connection to be torn down correctly.
+    </p>
+    <h2>Many uploads at once</h2>
+    <p>
+      Flat memory per request is only half of scalability; the other half is what happens when
+      several arrive together. Each batch below was fired simultaneously at one server process, with
+      resident memory sampled throughout.
+    </p>
+    <table>
+      <tr>
+        <th>Batch</th>
+        <th>Data in flight</th>
+        <th>All counts correct</th>
+        <th>Wall clock</th>
+        <th>Aggregate</th>
+        <th>Peak resident memory</th>
+      </tr>
+      <tr>
+        <td>50 × 1.4 MB</td>
+        <td>70 MB</td>
+        <td>yes</td>
+        <td>152 ms</td>
+        <td>456 MB/s</td>
+        <td>103 MB</td>
+      </tr>
+      <tr>
+        <td>200 × 1.4 MB</td>
+        <td>278 MB</td>
+        <td>yes</td>
+        <td>438 ms</td>
+        <td>635 MB/s</td>
+        <td>123 MB</td>
+      </tr>
+      <tr>
+        <td>8 × 146 MB</td>
+        <td><mark>1168 MB</mark></td>
+        <td>yes</td>
+        <td>1431 ms</td>
+        <td>816 MB/s</td>
+        <td><mark>99 MB</mark></td>
+      </tr>
+    </table>
+    <p>
+      The last row is the one that matters. Over a gigabyte of upload data was in flight at once and
+      the process never passed 99 MB, because no request ever holds its own file. The buffered
+      design would have needed room for all eight at the same time. Throughput rises with
+      concurrency rather than falling, since one request's counting overlaps another's network wait.
+    </p>
+    <p>
+      The server answered a normal upload immediately after each batch and logged no errors. Node
+      runs this work on one thread, so the ceiling is CPU rather than memory: past roughly 800 MB/s
+      of counting, further concurrency adds latency instead of throughput. Nothing here limits the
+      number of simultaneous uploads — a real deployment would want one, and it is named in the
+      README's future work.
     </p>
   </body>
 </html>

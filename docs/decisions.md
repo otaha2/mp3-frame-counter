@@ -188,8 +188,9 @@ counter and have the whole-buffer helper delegate to it.
 **Why.** A frame is decided entirely by its own four-byte header, so nothing
 earlier in the file is needed and the reader can carry a fixed amount of state:
 at most one frame while it looks for the start of the stream, plus the trailing
-128 bytes that may be an ID3v1 tag. Measured heap growth was 3.9 MB over
-208.6 MB of input. (b) is rejected because two copies of the same rules drift —
+128 bytes that may be an ID3v1 tag. Peak memory stays under 4 MB whether the
+input is 104 MB or 417 MB, where buffering the file cost 107 MB and 421 MB
+respectively. (b) is rejected because two copies of the same rules drift —
 delegating means the existing counter tests exercise the streaming machine,
 leaving chunk-size invariance as the only new thing to test.
 
