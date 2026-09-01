@@ -22,9 +22,19 @@ The server listens on port 3000 (override with `PORT`).
 
 ## Try it
 
+Send the MP3 as a form upload:
+
 ```bash
 curl -F "file=@test/fixtures/sample.mp3" http://localhost:3000/file-upload
 ```
+
+…or as the raw request body:
+
+```bash
+curl --data-binary @test/fixtures/sample.mp3 http://localhost:3000/file-upload
+```
+
+Either way:
 
 ```json
 { "frameCount": 6089 }
@@ -42,7 +52,10 @@ Runs lint, format check, typecheck and the test suite.
 
 ### `POST /file-upload`
 
-Accepts `multipart/form-data` with the MP3 in a field named `file`.
+Accepts the MP3 either as a `multipart/form-data` file part — under any field
+name — or as the raw request body. A non-multipart body is read as raw bytes
+whatever its `Content-Type` claims, because clients label binary payloads
+inconsistently; the bytes decide whether it is an MP3.
 
 **200**
 
@@ -61,12 +74,12 @@ Accepts `multipart/form-data` with the MP3 in a field named `file`.
 }
 ```
 
-| Status | `code`                   | Cause                                                |
-| ------ | ------------------------ | ---------------------------------------------------- |
-| 400    | `NO_FILE_UPLOADED`       | Multipart request with no file part                  |
-| 413    | `FILE_TOO_LARGE`         | Upload exceeded `MAX_UPLOAD_BYTES`                   |
-| 415    | `UNSUPPORTED_MEDIA_TYPE` | Body was not `multipart/form-data`                   |
-| 500    | `INTERNAL_ERROR`         | Unexpected failure; details are logged, not returned |
+| Status | `code`             | Cause                                                |
+| ------ | ------------------ | ---------------------------------------------------- |
+| 400    | `NO_FILE_UPLOADED` | Request carried no bytes                             |
+| 400    | `NO_FRAMES_FOUND`  | Bytes contained no MPEG-1 Layer III frames           |
+| 413    | `FILE_TOO_LARGE`   | Upload exceeded `MAX_UPLOAD_BYTES`                   |
+| 500    | `INTERNAL_ERROR`   | Unexpected failure; details are logged, not returned |
 
 ## Configuration
 
