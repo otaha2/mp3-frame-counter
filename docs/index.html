@@ -20,6 +20,12 @@
         <td>File anatomy, header bit fields, frame-length formula, tags and VBR headers.</td>
       </tr>
       <tr>
+        <td><a href="concepts/counting-as-bytes-arrive.html">Counting as bytes arrive</a></td>
+        <td>
+          How the counter survives being interrupted mid-frame, walked through with real traces.
+        </td>
+      </tr>
+      <tr>
         <td><a href="concepts/frame-counting.html">Counting frames</a></td>
         <td>The walk, the resynchronisation rule, and why one sync word is not enough.</td>
       </tr>
@@ -27,6 +33,10 @@
 
     <h2>Evidence</h2>
     <table>
+      <tr>
+        <td><a href="evidence/streaming-memory.html">Streaming counter measurements</a></td>
+        <td>Chunk-size invariance, heap growth over 208 MB, and a 146 MB upload end to end.</td>
+      </tr>
       <tr>
         <td><a href="evidence/sample-ground-truth.html">Sample ground truth</a></td>
         <td>

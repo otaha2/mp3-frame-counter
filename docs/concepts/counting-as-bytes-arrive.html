@@ -1,0 +1,269 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Counting as bytes arrive</title>
+    <link rel="stylesheet" href="../assets/docs.css" />
+  </head>
+  <body>
+    <h1>Counting as bytes arrive</h1>
+    <p class="scope">
+      A walkthrough of how the counter works when the file is delivered in pieces; explains
+      <code>src/mp3/frameCounter.ts</code> line by line in plain terms.
+    </p>
+
+    <h2>The one idea everything rests on</h2>
+    <p>
+      Every frame starts with a four-byte label. That label says, among other things, how long the
+      frame is. So once you know where one frame begins, you know exactly where the next one begins
+      — you never have to look at the audio in between.
+    </p>
+    <p>
+      Counting frames is therefore not a search. It is a walk: read a label, step over that many
+      bytes, read the next label, step again. The audio itself is never examined.
+    </p>
+    <pre><code>[label: 208 bytes] ................................. [label: 104 bytes] ...........
+ ^                                                   ^
+ read here, then step 208 bytes                      the next label is exactly here</code></pre>
+
+    <h2>What makes it awkward</h2>
+    <p>
+      The file arrives over a network in pieces of whatever size the network felt like. A piece may
+      end in the middle of a label, so only two of its four bytes have turned up. A single frame may
+      be spread over dozens of pieces. The counter has to survive being interrupted anywhere, and it
+      must not solve the problem by keeping the file — that would defeat the point.
+    </p>
+    <p>So it keeps two things, and only two:</p>
+    <table>
+      <tr>
+        <th><code>pending</code></th>
+        <td>The handful of bytes that have arrived but cannot be decided about yet.</td>
+      </tr>
+      <tr>
+        <th><code>skipRemaining</code></th>
+        <td>How many bytes of the current frame are still to be walked past.</td>
+      </tr>
+    </table>
+    <p>
+      That second one is the trick. If a frame is 417 bytes and a piece only covers 20 of them, the
+      counter walks past those 20, writes down “397 to go”, and throws the bytes away. It does not
+      need them. It already knows what they are: the middle of a frame.
+    </p>
+
+    <h2>Three things the counter can be doing</h2>
+
+    <figure>
+      <svg
+        viewBox="0 0 700 250"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="Three states: reading a label, walking past a frame, and lost; with the transitions between them"
+      >
+        <defs>
+          <marker id="fcArrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
+          </marker>
+        </defs>
+
+        <rect class="box" x="30" y="40" width="170" height="52" rx="4" />
+        <text x="52" y="64">Reading a label</text>
+        <text class="lbl" x="52" y="82">needs 4 bytes</text>
+
+        <rect class="box" x="420" y="40" width="200" height="52" rx="4" />
+        <rect class="hot" x="420" y="40" width="200" height="52" rx="4" />
+        <text x="442" y="64">Walking past a frame</text>
+        <text class="lbl" x="442" y="82">keeps only a countdown</text>
+
+        <rect class="box" x="220" y="170" width="170" height="52" rx="4" />
+        <text x="242" y="194">Lost</text>
+        <text class="lbl" x="242" y="212">shuffling one byte at a time</text>
+
+        <path class="arrow" d="M204,58 L414,58" stroke="currentColor" />
+        <text class="lbl" x="222" y="34">the label makes sense — step over that many bytes</text>
+
+        <path class="arrow" d="M414,80 C 330,110 280,100 200,80" stroke="currentColor" />
+        <text class="lbl" x="252" y="118">countdown hits zero — tally one frame</text>
+
+        <path class="arrow" d="M110,96 L268,166" stroke="currentColor" />
+        <text class="lbl" x="60" y="150">no label here</text>
+
+        <path class="arrow" d="M330,166 C 380,120 300,80 208,68" stroke="currentColor" />
+        <text class="lbl" x="360" y="140">found two labels that agree</text>
+
+        <path class="arrow" d="M250,224 C 210,250 400,250 362,226" stroke="currentColor" />
+        <text class="lbl" x="252" y="248">try the next byte</text>
+      </svg>
+      <figcaption>
+        Almost all of a healthy file is spent on the right-hand box, walking, which costs one
+        subtraction per piece of network traffic.
+      </figcaption>
+    </figure>
+
+    <p>
+      There is a fourth possibility that is not really a state: <strong>waiting</strong>. If fewer
+      than four bytes have arrived, no label can be read, so the counter stops and returns. The next
+      piece of the file will carry on from exactly where it left off.
+    </p>
+
+    <h2>Watching it work: a clean file in 100-byte pieces</h2>
+    <p>
+      This is the real sample file, fed in through 100 bytes at a time. Its first frame begins at
+      byte 44, after an ID3v2 tag, and is 208 bytes long. The second is 104 bytes.
+    </p>
+    <table>
+      <tr>
+        <th>Bytes in so far</th>
+        <th>What happens</th>
+      </tr>
+      <tr>
+        <td>100</td>
+        <td>Nothing yet — see “the last 128 bytes” below.</td>
+      </tr>
+      <tr>
+        <td>200</td>
+        <td>
+          The tag says it is 44 bytes long, so walk past 44. At byte 44 a label appears saying “208
+          bytes”. Not enough of the file has arrived to check it. <em>Wait.</em>
+        </td>
+      </tr>
+      <tr>
+        <td>300</td>
+        <td>Still not enough to check the label. <em>Wait.</em></td>
+      </tr>
+      <tr>
+        <td>400</td>
+        <td>
+          Now byte 252 has arrived, and there is a second label sitting there — exactly where the
+          first one said it would be. Both are believed. Walk past 208 bytes:
+          <strong>frame 1 complete</strong>. Read the label at 252, which says 104, and walk past
+          the 20 bytes of it that have arrived. 84 to go.
+        </td>
+      </tr>
+      <tr>
+        <td>500</td>
+        <td>
+          Walk past the remaining 84: <strong>frame 2 complete</strong>. Read the next label, walk
+          past 16 of its 104 bytes. 88 to go.
+        </td>
+      </tr>
+      <tr>
+        <td>600</td>
+        <td>Walk past 88: <strong>frame 3 complete</strong>. And so on, 6089 times.</td>
+      </tr>
+    </table>
+    <p>
+      Notice what never happened: no byte was ever looked at twice, and nothing was stored except a
+      countdown and a few undecided bytes.
+    </p>
+
+    <h2>Watching it recover: a file with damage in the middle</h2>
+    <p>Four frames of 417 bytes each, with 35 bytes of rubbish injected after the second one.</p>
+    <table>
+      <tr>
+        <th>Position</th>
+        <th>What happens</th>
+      </tr>
+      <tr>
+        <td>0</td>
+        <td>Label says 417. Walk past it. <strong>Frame 1 complete.</strong></td>
+      </tr>
+      <tr>
+        <td>417</td>
+        <td>Label says 417. Walk past it. <strong>Frame 2 complete.</strong></td>
+      </tr>
+      <tr>
+        <td>834</td>
+        <td>
+          A label was expected here and there is none. <strong>Lost.</strong> Try byte 835, then
+          836, then 837 — one at a time, 35 times.
+        </td>
+      </tr>
+      <tr>
+        <td>869</td>
+        <td>
+          A label appears. Because the counter is lost, one label is not enough: it checks that a
+          second label sits 417 bytes further on. It does.
+          <strong>Trust restored, frame 3 complete.</strong>
+        </td>
+      </tr>
+      <tr>
+        <td>1286</td>
+        <td>Back to walking. <strong>Frame 4 complete.</strong></td>
+      </tr>
+    </table>
+    <p>
+      The final answer is 4 frames and 35 bytes discarded — exactly the rubbish that was inserted.
+      The damage cost nothing but the bytes it occupied.
+    </p>
+
+    <h2>Why one label is not enough when lost</h2>
+    <p>
+      A label begins with eleven bits that are all 1s. That pattern is common: it appears inside
+      compressed audio, inside photographs, inside almost any large file. If the counter believed
+      every plausible label it found, it would report a frame count for a JPEG, and the API would
+      answer a confident number for a file that is not music at all.
+    </p>
+    <p>
+      So while it is lost, the counter demands a second opinion: a label must be followed by another
+      label at precisely the distance the first one claimed. Two accidents agreeing to the byte is
+      vanishingly unlikely. Once the chain is running the check is dropped, because the chain is
+      itself the evidence — which is why this costs nothing on an undamaged file.
+    </p>
+
+    <h2>Why the last 128 bytes are held back</h2>
+    <p>
+      Some MP3 files end with a 128-byte block of text: the track title, artist, year. It is not
+      audio and must not be counted. The trouble is that you cannot tell you are at the end of a
+      stream until it ends — and by then you have already read the bytes.
+    </p>
+    <p>
+      So the counter always keeps the most recent 128 bytes unexamined, staying deliberately a
+      little behind. When the stream finishes, it looks at those held-back bytes: if they are a tag,
+      it discards them; if they are audio, it counts them. This is why nothing happened in the
+      example above until 200 bytes had arrived — the first 100 were still inside the withheld
+      window.
+    </p>
+
+    <h2>Everything the counter remembers</h2>
+    <p>This is the complete state. It does not grow, no matter how large the file is.</p>
+    <table>
+      <tr>
+        <th>What</th>
+        <th>Why</th>
+        <th>Biggest it gets</th>
+      </tr>
+      <tr>
+        <td><code>pending</code></td>
+        <td>Bytes not yet decided about</td>
+        <td>One frame plus the 128 held back — about 1.2 KB</td>
+      </tr>
+      <tr>
+        <td><code>skipRemaining</code></td>
+        <td>Bytes left in the frame being walked past</td>
+        <td>A number</td>
+      </tr>
+      <tr>
+        <td><code>skippedFrameIsMetadata</code></td>
+        <td>Whether this run of bytes ends a frame, and whether that frame is the encoder’s</td>
+        <td>True, false, or “not in a frame”</td>
+      </tr>
+      <tr>
+        <td><code>inSync</code></td>
+        <td>Whether the chain is currently trusted</td>
+        <td>True or false</td>
+      </tr>
+      <tr>
+        <td>Four tallies</td>
+        <td>Frames, metadata frames, discarded bytes, whether the tag was measured</td>
+        <td>Three numbers and a flag</td>
+      </tr>
+    </table>
+    <p>
+      Measured: 208 MB of audio pushed through one counter grew the heap by 3.9 MB. The
+      <a href="../evidence/streaming-memory.html">measurements page</a> has the figures, and
+      <a href="frame-counting.html">the counting rules</a> covers what makes a frame valid in the
+      first place.
+    </p>
+  </body>
+</html>

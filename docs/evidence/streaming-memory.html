@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Streaming counter measurements</title>
+    <link rel="stylesheet" href="../assets/docs.css" />
+  </head>
+  <body>
+    <h1>Streaming counter measurements</h1>
+    <p class="scope">
+      Memory, throughput and chunk-size behaviour of the incremental counter; informs
+      <code>src/mp3/frameCounter.ts</code> and the upload route.
+    </p>
+
+    <h2>The answer does not depend on chunk size</h2>
+    <p>
+      <code>test/fixtures/sample.mp3</code> fed through one counter in fixed-size pieces. A one-byte
+      chunk splits every header across four calls; 7 and 100 divide frames at offsets that never
+      align with a boundary.
+    </p>
+    <table>
+      <tr>
+        <th>Chunk size (bytes)</th>
+        <th>1</th>
+        <th>7</th>
+        <th>100</th>
+        <th>4096</th>
+        <th>whole file</th>
+      </tr>
+      <tr>
+        <th>Frames</th>
+        <td><mark>6089</mark></td>
+        <td><mark>6089</mark></td>
+        <td><mark>6089</mark></td>
+        <td><mark>6089</mark></td>
+        <td><mark>6089</mark></td>
+      </tr>
+      <tr>
+        <th>Bytes resynchronised</th>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+        <td>0</td>
+      </tr>
+      <tr>
+        <th>Time</th>
+        <td>246 ms</td>
+        <td>39 ms</td>
+        <td>2 ms</td>
+        <td>1 ms</td>
+        <td>&lt; 1 ms</td>
+      </tr>
+    </table>
+
+    <h2>Memory does not grow with the stream</h2>
+    <p>
+      208.6 MB pushed through a single counter in 64 KB chunks, heap sampled with
+      <code>--expose-gc</code>:
+    </p>
+    <table>
+      <tr>
+        <th>Heap before</th>
+        <td>6.9 MB</td>
+      </tr>
+      <tr>
+        <th>Heap peak</th>
+        <td>10.8 MB</td>
+      </tr>
+      <tr>
+        <th>Growth</th>
+        <td><mark>3.9 MB</mark> over 208.6 MB of input</td>
+      </tr>
+    </table>
+    <p>
+      The counter retains only what it cannot yet decide: at most one frame while it is looking for
+      the start of the stream, and the trailing 128 bytes that may prove to be an ID3v1 tag. The
+      largest MPEG-1 Layer III frame is 1045 bytes, so the ceiling is on the order of a kilobyte
+      whatever the file size.
+    </p>
+
+    <h2>The same holds through the HTTP layer</h2>
+    <p>
+      A 146 MB file — 105 copies of the sample concatenated, so 105 × 6090 − 1 frames, since only
+      the first copy's Xing frame opens the stream — uploaded to a running server.
+    </p>
+    <table>
+      <tr>
+        <th>Upload</th>
+        <th>Response</th>
+        <th>Wall clock</th>
+        <th>Server resident memory</th>
+      </tr>
+      <tr>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>70.3 MB at rest</td>
+      </tr>
+      <tr>
+        <td>146 MB, multipart</td>
+        <td><code>{"frameCount":<mark>639449</mark>}</code></td>
+        <td>0.69 s</td>
+        <td>73.2 MB</td>
+      </tr>
+      <tr>
+        <td>146 MB, raw body</td>
+        <td><code>{"frameCount":<mark>639449</mark>}</code></td>
+        <td>0.84 s</td>
+        <td>77.8 MB</td>
+      </tr>
+    </table>
+    <p>
+      Two uploads totalling 292 MB moved resident memory by 7.5 MB, none of it proportional to the
+      files. Throughput is roughly 200 MB/s, so the request is bounded by the network rather than by
+      the parsing.
+    </p>
+
+    <h2>The size limit is enforced without buffering</h2>
+    <p>With <code>MAX_UPLOAD_BYTES=5000000</code>, the same 146 MB file on both paths:</p>
+    <table>
+      <tr>
+        <th>Path</th>
+        <th>Result</th>
+      </tr>
+      <tr>
+        <td>Raw body</td>
+        <td>413 <code>FILE_TOO_LARGE</code>, refused once the limit was passed</td>
+      </tr>
+      <tr>
+        <td>Multipart</td>
+        <td>413 <code>FILE_TOO_LARGE</code>, identical body</td>
+      </tr>
+    </table>
+    <p>
+      Neither request stalled and the server answered a normal upload immediately afterwards, which
+      is the failure mode worth checking: rejecting a request part-way through its body leaves the
+      connection to be torn down correctly.
+    </p>
+  </body>
+</html>
