@@ -12,8 +12,11 @@ import Fastify, {
   type FastifyServerOptions,
 } from 'fastify';
 import type { Config } from '../config';
-import { ApiError, ErrorCode, UnsupportedMediaTypeError } from './errors';
+import { ApiError, ErrorCode, FileTooLargeError } from './errors';
 import { registerFileUploadRoute } from './routes/fileUpload';
+
+/** Fastify's code for a raw body that exceeded `bodyLimit`. */
+const FASTIFY_BODY_TOO_LARGE = 'FST_ERR_CTP_BODY_TOO_LARGE';
 
 /** The JSON body returned for every failure. Mirrors Fastify's own shape. */
 export interface ErrorBody {
@@ -43,11 +46,14 @@ function codeFromStatus(statusCode: number): string {
  * @param options - Fastify options, used by tests to silence logging.
  */
 export function buildApp(config: Config, options: FastifyServerOptions = {}): FastifyInstance {
-  const app = Fastify(options);
+  const app = Fastify({
+    // Applies to a raw body; the multipart plugin enforces its own file limit.
+    bodyLimit: config.maxUploadBytes,
+    ...options,
+  });
 
-  // This API accepts exactly one body format. Dropping the built-in JSON and
-  // text parsers means any other Content-Type reaches the catch-all below and
-  // gets an actionable 415 instead of Fastify's bare "Unsupported Media Type".
+  // The built-in JSON and text parsers would decode a body this service never
+  // wants decoded, so they are replaced by the catch-all below.
   app.removeAllContentTypeParsers();
 
   void app.register(multipart, {
@@ -57,18 +63,26 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
     },
   });
 
-  // Catches every Content-Type except multipart/form-data. A request with no
-  // Content-Type header at all never reaches a parser, so the route guards
-  // that case itself; the two checks together cover every non-multipart body.
-  app.addContentTypeParser('*', (request, _payload, done) => {
-    done(new UnsupportedMediaTypeError(request.headers['content-type']), undefined);
+  // An MP3 may be sent either as a multipart file part or as the raw request
+  // body. Everything that is not multipart is taken as raw bytes, whatever the
+  // Content-Type claims: clients are inconsistent about labelling a binary
+  // body — curl's --data-binary defaults to application/x-www-form-urlencoded
+  // — and the bytes themselves settle whether this is an MP3. A body that does
+  // not parse as MPEG-1 Layer III is reported as such by the route.
+  app.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, done) => {
+    done(null, body);
   });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    if (error instanceof ApiError) {
+    // An oversized raw body is rejected by Fastify and an oversized part by
+    // busboy; to a client they are one condition, so they report as one.
+    const failure =
+      error.code === FASTIFY_BODY_TOO_LARGE ? new FileTooLargeError(config.maxUploadBytes) : error;
+
+    if (failure instanceof ApiError) {
       return reply
-        .status(error.statusCode)
-        .send(errorBody(error.statusCode, error.code, error.message));
+        .status(failure.statusCode)
+        .send(errorBody(failure.statusCode, failure.code, failure.message));
     }
 
     // Errors raised by Fastify or its plugins already carry a status; a

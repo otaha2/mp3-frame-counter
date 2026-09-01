@@ -11,7 +11,7 @@
 export const ErrorCode = {
   NoFileUploaded: 'NO_FILE_UPLOADED',
   FileTooLarge: 'FILE_TOO_LARGE',
-  UnsupportedMediaType: 'UNSUPPORTED_MEDIA_TYPE',
+  NoFramesFound: 'NO_FRAMES_FOUND',
   Internal: 'INTERNAL_ERROR',
 } as const;
 
@@ -28,7 +28,7 @@ export abstract class ApiError extends Error {
   }
 }
 
-/** The request was multipart but carried no file part. */
+/** The request carried no bytes to count. */
 export class NoFileUploadedError extends ApiError {
   readonly statusCode = 400;
   readonly code = ErrorCode.NoFileUploaded;
@@ -36,7 +36,24 @@ export class NoFileUploadedError extends ApiError {
   /** @param exampleFieldName - suggested field name; any name is accepted. */
   constructor(exampleFieldName: string) {
     super(
-      `No file was uploaded. Attach the MP3 as a file part — any field name is accepted, for example "${exampleFieldName}".`,
+      `No file was uploaded. Send the MP3 as the request body, or as a multipart file part — any field name is accepted, for example "${exampleFieldName}".`,
+    );
+  }
+}
+
+/**
+ * Bytes were received but contained no frames of the supported format.
+ *
+ * Reported rather than answering zero: a count of zero would suggest a valid
+ * but empty MP3, when the likely cause is a file of another kind.
+ */
+export class NoFramesFoundError extends ApiError {
+  readonly statusCode = 400;
+  readonly code = ErrorCode.NoFramesFound;
+
+  constructor() {
+    super(
+      'No MPEG Version 1 Layer III frames were found. The upload does not appear to be an MP3 file of that format.',
     );
   }
 }
@@ -48,16 +65,5 @@ export class FileTooLargeError extends ApiError {
 
   constructor(maxBytes: number) {
     super(`Uploaded file exceeds the maximum size of ${maxBytes} bytes.`);
-  }
-}
-
-/** The request body was not a multipart/form-data upload. */
-export class UnsupportedMediaTypeError extends ApiError {
-  readonly statusCode = 415;
-  readonly code = ErrorCode.UnsupportedMediaType;
-
-  constructor(received: string | undefined) {
-    const got = received === undefined || received === '' ? 'none' : received;
-    super(`Expected Content-Type "multipart/form-data", received ${got}.`);
   }
 }

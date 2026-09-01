@@ -95,7 +95,7 @@ describe('POST /file-upload', () => {
     expect(body.message).toContain(FILE_FIELD_NAME);
   });
 
-  it('rejects an upload larger than the configured limit', async () => {
+  it('rejects a multipart upload larger than the configured limit', async () => {
     app = build({ maxUploadBytes: 1024 });
 
     const response = await app.inject({
@@ -115,40 +115,93 @@ describe('POST /file-upload', () => {
     expect(body.message).toContain('1024');
   });
 
-  it.each([
-    ['application/json', '{"file":"x"}'],
-    ['text/plain', 'plain text'],
-    ['application/octet-stream', 'raw bytes'],
-  ])('rejects a %s body as unsupported media', async (contentType, payload) => {
-    app = build();
+  it('rejects a raw body larger than the configured limit with the same error', async () => {
+    // Fastify rejects an oversized raw body, busboy an oversized part; both
+    // must reach the client as one condition.
+    app = build({ maxUploadBytes: 1024 });
 
     const response = await app.inject({
       method: 'POST',
       url: '/file-upload',
-      headers: { 'content-type': contentType },
-      payload,
+      headers: { 'content-type': 'audio/mpeg' },
+      payload: Buffer.alloc(4096, 0x41),
     });
 
-    expect(response.statusCode).toBe(415);
-
-    const body = response.json<ErrorBody>();
-    expect(body).toMatchObject({
-      statusCode: 415,
-      code: 'UNSUPPORTED_MEDIA_TYPE',
-      error: 'Unsupported Media Type',
+    expect(response.statusCode).toBe(413);
+    expect(response.json<ErrorBody>()).toMatchObject({
+      statusCode: 413,
+      code: 'FILE_TOO_LARGE',
     });
-    expect(body.message).toContain(contentType);
   });
 
-  it('rejects a request with no Content-Type at all', async () => {
-    // Fastify skips body parsing without a Content-Type, so this exercises the
-    // route's own guard rather than the catch-all parser.
-    app = build();
+  describe('a raw request body', () => {
+    it.each([
+      'audio/mpeg',
+      'application/octet-stream',
+      // curl's --data-binary sends this unless told otherwise, so a plain
+      // binary upload must not depend on the client labelling it correctly.
+      'application/x-www-form-urlencoded',
+    ])('is counted when sent as %s', async (contentType) => {
+      app = build();
 
-    const response = await app.inject({ method: 'POST', url: '/file-upload' });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        headers: { 'content-type': contentType },
+        payload: readFileSync(SAMPLE_PATH),
+      });
 
-    expect(response.statusCode).toBe(415);
-    expect(response.json<ErrorBody>()).toMatchObject({ code: 'UNSUPPORTED_MEDIA_TYPE' });
+      expect(response.statusCode).toBe(200);
+      expect(response.json<FrameCountResponse>().frameCount).toBe(
+        groundTruth.files['sample.mp3']?.expectedFrameCount,
+      );
+    });
+
+    it('is counted when the client sends no Content-Type at all', async () => {
+      app = build();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        payload: readFileSync(SAMPLE_PATH),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<FrameCountResponse>().frameCount).toBe(
+        groundTruth.files['sample.mp3']?.expectedFrameCount,
+      );
+    });
+  });
+
+  describe('bodies that are not MP3 files', () => {
+    it.each([
+      ['JSON', '{"file":"x"}'],
+      ['plain text', 'this is definitely not an mp3'],
+      ['arbitrary binary', Buffer.alloc(4096, 0x7e)],
+    ])('reports %s as containing no frames', async (_label, payload) => {
+      app = build();
+
+      const response = await app.inject({ method: 'POST', url: '/file-upload', payload });
+
+      expect(response.statusCode).toBe(400);
+
+      const body = response.json<ErrorBody>();
+      expect(body).toMatchObject({
+        statusCode: 400,
+        code: 'NO_FRAMES_FOUND',
+        error: 'Bad Request',
+      });
+      expect(body.message).toContain('MPEG Version 1 Layer III');
+    });
+
+    it('rejects an empty request rather than answering zero', async () => {
+      app = build();
+
+      const response = await app.inject({ method: 'POST', url: '/file-upload' });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json<ErrorBody>()).toMatchObject({ code: 'NO_FILE_UPLOADED' });
+    });
   });
 
   it('accepts a file part under any field name', async () => {
@@ -157,10 +210,13 @@ describe('POST /file-upload', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/file-upload',
-      ...multipartFile('audio', 'sample.mp3', Buffer.alloc(256, 0x41)),
+      ...multipartFile('audio', 'sample.mp3', readFileSync(SAMPLE_PATH)),
     });
 
     expect(response.statusCode).toBe(200);
+    expect(response.json<FrameCountResponse>().frameCount).toBe(
+      groundTruth.files['sample.mp3']?.expectedFrameCount,
+    );
   });
 
   it('answers 404 in the standard error shape for an unknown route', async () => {
