@@ -9,30 +9,26 @@
   <body>
     <h1>Counting as bytes arrive</h1>
     <p class="scope">
-      A walkthrough of how the counter works when the file is delivered in pieces; explains
-      <code>src/mp3/frameCounter.ts</code> line by line in plain terms.
+      How the counter survives a file arriving in pieces, when a frame may be split across two of
+      them. What makes something a frame in the first place is settled by
+      <a href="frame-counting.html">the counting rules</a>; this page is only about applying them
+      without holding the file. Informs <code>src/mp3/frameCounter.ts</code>.
     </p>
 
-    <h2>The one idea everything rests on</h2>
+    <h2>The problem</h2>
     <p>
-      Every frame starts with a four-byte label. That label says, among other things, how long the
-      frame is. So once you know where one frame begins, you know exactly where the next one begins
-      — you never have to look at the audio in between.
+      Counting is a walk: read a frame's four-byte header, step forward by the length it declares,
+      read the next one. That works comfortably when the whole file is in hand.
     </p>
-    <p>
-      Counting frames is therefore not a search. It is a walk: read a label, step over that many
-      bytes, read the next label, step again. The audio itself is never examined.
-    </p>
-    <pre><code>[label: 208 bytes] ................................. [label: 104 bytes] ...........
+    <pre><code>[header: 208 bytes] ................................ [header: 104 bytes] ..........
  ^                                                   ^
- read here, then step 208 bytes                      the next label is exactly here</code></pre>
-
-    <h2>What makes it awkward</h2>
+ read here, then step 208 bytes                      the next header is exactly here</code></pre>
     <p>
-      The file arrives over a network in pieces of whatever size the network felt like. A piece may
-      end in the middle of a label, so only two of its four bytes have turned up. A single frame may
-      be spread over dozens of pieces. The counter has to survive being interrupted anywhere, and it
-      must not solve the problem by keeping the file — that would defeat the point.
+      An upload does not arrive in one piece. It comes over a network in chunks of whatever size the
+      network chose, so a chunk may end in the middle of a header with two of its four bytes still
+      to come, and a single frame may be spread over dozens of chunks. The counter has to survive
+      being interrupted anywhere — and it must not solve the problem by keeping the file, which
+      would defeat the point of streaming at all.
     </p>
     <p>So it keeps two things, and only two:</p>
     <table>
@@ -197,18 +193,14 @@
       The damage cost nothing but the bytes it occupied.
     </p>
 
-    <h2>Why one label is not enough when lost</h2>
+    <h2>Waiting for a second opinion</h2>
     <p>
-      A label begins with eleven bits that are all 1s. That pattern is common: it appears inside
-      compressed audio, inside photographs, inside almost any large file. If the counter believed
-      every plausible label it found, it would report a frame count for a JPEG, and the API would
-      answer a confident number for a file that is not music at all.
-    </p>
-    <p>
-      So while it is lost, the counter demands a second opinion: a label must be followed by another
-      label at precisely the distance the first one claimed. Two accidents agreeing to the byte is
-      vanishingly unlikely. Once the chain is running the check is dropped, because the chain is
-      itself the evidence — which is why this costs nothing on an undamaged file.
+      While lost, the counter will not accept a header until a second one appears exactly one frame
+      further on — <a href="frame-counting.html">the counting rules</a> explain why a single header
+      proves so little. Streaming adds a wrinkle to that: the confirming header may not have arrived
+      yet. When that happens the counter simply stops and waits, holding the candidate frame until
+      enough bytes turn up to judge it. This is the only situation in which it holds more than a few
+      bytes, and it is bounded by the largest frame the format allows.
     </p>
 
     <h2>Why the last 128 bytes are held back</h2>

@@ -9,8 +9,11 @@
   <body>
     <h1>Counting frames</h1>
     <p class="scope">
-      Covers the rules that turn a byte stream into a frame count; informs
-      <code>src/mp3/countFrames.ts</code> and the streaming counter that replaces it.
+      The rules that decide what counts as a frame — which bytes are audio, which are metadata, and
+      what to do with damage. How those rules are applied to a stream arriving in pieces is a
+      separate matter, covered in
+      <a href="counting-as-bytes-arrive.html">counting as bytes arrive</a>. Informs
+      <code>src/mp3/frameCounter.ts</code>.
     </p>
 
     <h2>The walk</h2>

@@ -28,7 +28,7 @@
         <th>Tools</th>
         <td>
           MediaInfoLib v26.05 (winget MediaArea.MediaInfo), ffprobe 9.0.1 (winget Gyan.FFmpeg), GNU
-          od, Node 20 walker script
+          od for the byte dumps
         </td>
       </tr>
     </table>
@@ -47,7 +47,7 @@
       </tr>
       <tr>
         <th>Mode</th>
-        <td>Joint stereo / MS, 2ch, 44100 Hz</td>
+        <td>Joint stereo (the two channels share data where they are alike), 2ch, 44100 Hz</td>
         <td>2ch, 44100 Hz</td>
       </tr>
       <tr>
@@ -67,12 +67,12 @@
       </tr>
       <tr>
         <th>Writing library</th>
-        <td>LAME3.100 (container: Lavf60.3.100)</td>
+        <td>Encoded by LAME 3.100; the file was assembled by ffmpeg&rsquo;s muxer</td>
         <td>—</td>
       </tr>
     </table>
 
-    <h2>Byte-level findings (od + walker)</h2>
+    <h2>Byte-level findings</h2>
     <table>
       <tr>
         <th>Offset</th>
@@ -87,7 +87,7 @@
       <tr>
         <td>10</td>
         <td><code>TSSE … "Lavf60.3.100"</code></td>
-        <td>Sole tag content: encoder software string</td>
+        <td>The tag holds one field: the name of the software that wrote the file</td>
       </tr>
       <tr>
         <td>44</td>
@@ -101,9 +101,9 @@
         <td>80</td>
         <td><code>"Xing" 00 00 00 0f | 00 00 17 c9 | 00 16 3f d0</code></td>
         <td>
-          Xing header 36 bytes into frame 1 (4 hdr + 32 side info, MPEG-1 stereo). Flags 0xF
-          (frames, bytes, TOC, quality). Frames = 0x17C9 = <mark>6089</mark>; bytes = 0x163FD0 =
-          1,458,128 = file − ID3v2
+          Xing marker 36 bytes into frame 1, past the 4-byte header and 32 bytes of side
+          information. Its flags (0xF) say all four optional fields are present. Frames = 0x17C9 =
+          <mark>6089</mark>; bytes = 0x163FD0 = 1,458,128, which is the file less its ID3v2 tag
         </td>
       </tr>
       <tr>
@@ -119,14 +119,18 @@
       <tr>
         <td>1,458,044</td>
         <td>no <code>"TAG"</code></td>
-        <td>No ID3v1 tail; file ends inside the final frame's 0xAA fill bytes</td>
+        <td>
+          No ID3v1 tail. The file ends inside the last frame, whose unused payload is padded with
+          0xAA bytes
+        </td>
       </tr>
     </table>
 
     <h2>Independent frame walk</h2>
     <p>
-      A throwaway Node script walked the file from offset 44, jumping by each header's computed
-      length and resyncing byte-by-byte on failure:
+      Walking the file from offset 44 — reading each header, jumping by the length it declares, and
+      resynchronising byte by byte on failure — gives an account of the file that owes nothing to
+      either tool:
     </p>
     <table>
       <tr>
@@ -153,15 +157,15 @@
       </tr>
     </table>
     <p>
-      <code>src/mp3/frameHeader.ts</code> reproduces these totals exactly, and the frames tile to
-      byte 1,458,172 — the precise end of the file.
+      Every frame is accounted for: they tile from byte 44 to byte 1,458,172, the precise end of the
+      file, with nothing left between them.
     </p>
 
     <h2>Generated fixtures</h2>
     <p>
-      Three short files produced with ffmpeg to cover shapes the sample does not: constant bitrate,
-      a single channel, a file with no tags or metadata frame at all, and an ID3v1 tail. Counts
-      recorded in <code>test/fixtures/expected-counts.json</code>.
+      Three short files produced with ffmpeg, each covering something the sample does not: a
+      constant bitrate with no tags at all, a single channel, and an ID3v1 tail. Counts recorded in
+      <code>test/fixtures/expected-counts.json</code>.
     </p>
     <table>
       <tr>
@@ -198,49 +202,87 @@
       </tr>
     </table>
 
-    <h2>The reference tools do not agree with each other</h2>
+    <h2>Two files that are not well formed</h2>
     <p>
-      On <code>cbr-64-mono-info.mp3</code> mediainfo reports 79 and ffprobe reports 78. The file
-      holds 79 structurally valid frames, the first of which is an <code>Info</code> metadata frame
-      whose own frame-count field reads 78.
+      Two more fixtures exist to exercise what happens when the input is damaged or is not an MP3 at
+      all. They are kept apart from the ones above because the tools disagree about them, and
+      because a count is not the expected outcome for both.
     </p>
     <table>
       <tr>
         <th>File</th>
-        <th>Metadata frame</th>
-        <th>mediainfo behaviour</th>
+        <th>What it is</th>
+        <th>Complete frames</th>
+        <th>mediainfo</th>
+        <th>ffprobe</th>
+        <th>Expected</th>
       </tr>
       <tr>
-        <td><code>sample.mp3</code> (VBR)</td>
-        <td>Xing, field = 6089</td>
-        <td>Reports 6089 — the field's value, excluding the metadata frame</td>
+        <td><code>truncated.mp3</code></td>
+        <td>The first 20,000 bytes of the sample, cut mid-frame</td>
+        <td>96</td>
+        <td><mark>6089</mark></td>
+        <td><mark>96</mark></td>
+        <td>95</td>
       </tr>
       <tr>
-        <td><code>cbr-64-mono-info.mp3</code> (CBR)</td>
-        <td>Info, field = 78</td>
-        <td>Reports 79 — a physical count, including the metadata frame</td>
+        <td><code>not-audio.wav</code></td>
+        <td>A real WAV file produced by ffmpeg — a genuine container, but not an MP3</td>
+        <td>0</td>
+        <td>—</td>
+        <td>—</td>
+        <td>400 <code>NO_FRAMES_FOUND</code></td>
       </tr>
     </table>
     <p>
-      mediainfo is therefore not self-consistent across the two files: it appears to read the
-      declared field for a variable-bitrate stream and to count frames itself for a constant one.
-      ffprobe excludes the metadata frame in both cases, as does each file's own header field. This
-      service follows the consistent reading — see <a href="../decisions.md">decisions.md</a> D11.
+      In <code>truncated.mp3</code>, 96 complete frames end at byte 19,973 and a 97th declares 261
+      bytes of which only 27 are present.
     </p>
 
-    <h2>The discrepancy, resolved</h2>
+    <h2>Why the tools disagree, and which one to follow</h2>
     <p>
-      Physical walk: <strong>6090</strong>. mediainfo, ffprobe, and the file's own Xing field:
-      <strong>6089</strong>. The difference is exactly frame 1 — the Xing metadata frame, which is a
-      validly-shaped frame carrying no audio. Reference tools exclude it; the Xing field's byte
-      count (which <em>includes</em> its own frame) confirms the count field describes the frames
-      after it. The channel-mode split is a fourth, independent witness to the same boundary: the
-      metadata frame declares stereo while all 6089 audio frames declare joint stereo. Decision:
-      report 6089-style counts — physical frames minus a detected Xing/Info/VBRI frame (<a
-        href="../decisions.md"
-        >decisions.md</a
-      >
-      D1). Expected count for this file: <mark>6089</mark>.
+      Three different numbers have now appeared for files this project can measure exactly, and the
+      pattern behind them is the most useful thing on this page.
+    </p>
+    <table>
+      <tr>
+        <th>File</th>
+        <th>What is really there</th>
+        <th>mediainfo says</th>
+        <th>ffprobe says</th>
+      </tr>
+      <tr>
+        <td><code>sample.mp3</code> (VBR)</td>
+        <td>6090 frames, the first a Xing frame declaring 6089</td>
+        <td>6089</td>
+        <td>6089</td>
+      </tr>
+      <tr>
+        <td><code>cbr-64-mono-info.mp3</code> (CBR)</td>
+        <td>79 frames, the first an Info frame declaring 78</td>
+        <td><mark>79</mark></td>
+        <td>78</td>
+      </tr>
+      <tr>
+        <td><code>truncated.mp3</code></td>
+        <td>96 complete frames; the file was cut to 20,000 bytes</td>
+        <td><mark>6089</mark></td>
+        <td>96</td>
+      </tr>
+    </table>
+    <p>
+      mediainfo is not consistent with itself. On the variable-bitrate files it reports the number
+      the metadata frame <em>declares</em>, which is why a file cut to 20,000 bytes still reports
+      6089 — a figure describing a file that no longer exists. On the constant-bitrate file it
+      counts frames itself, and so includes the Info frame that carries no audio. ffprobe counts in
+      both cases, though on the truncated file it counts a frame missing 234 of its 261 bytes.
+    </p>
+    <p>
+      This service counts frames whose bytes are all present, and excludes a leading metadata frame:
+      6089, 78 and 95 for the three files above. Four independent signals support that reading of
+      the sample — mediainfo, ffprobe, the Xing field itself, and the channel-mode split, in which
+      the single stereo frame is the metadata frame and all 6089 audio frames declare joint stereo.
+      The reasoning is recorded in <a href="../decisions.md">decisions.md</a> D1, D11 and D17.
     </p>
   </body>
 </html>

@@ -9,14 +9,32 @@
   <body>
     <h1>MPEG-1 Layer III file structure</h1>
     <p class="scope">
-      Covers the byte layout of an MP3 file and the frame-header fields; informs
-      <code>src/mp3/frameHeader.ts</code> and both counters.
+      What an MP3 file is made of, and what the four bytes at the start of every frame mean; informs
+      <code>src/mp3/frameHeader.ts</code>.
+    </p>
+
+    <h2>What a frame is</h2>
+    <p>
+      An MP3 is not one continuous recording. It is a long run of small, independent packets called
+      <strong>frames</strong>, each holding a fixed 1152 samples of audio — about 26 milliseconds at
+      CD sampling rates. A three-minute track is roughly seven thousand of them, end to end.
+    </p>
+    <p>
+      Every frame opens with four bytes describing how that frame was encoded, and those four bytes
+      are the whole reason frames can be counted without understanding audio: they give the frame's
+      length, so the next frame's position is calculated rather than searched for.
+    </p>
+    <p>
+      Two terms recur below. <strong>Bitrate</strong> is how much data each second of audio was
+      given; a higher bitrate means larger frames. An encoder may use one bitrate throughout
+      (<strong>constant bitrate</strong>, CBR) or vary it to spend more data on complicated passages
+      (<strong>variable bitrate</strong>, VBR). Both appear in this project's fixtures, and the
+      counter treats them the same way because every frame declares its own size.
     </p>
 
     <h2>File anatomy</h2>
     <p>
-      An MP3 file is a flat sequence of self-describing frames, optionally wrapped in metadata tags
-      that are not frames:
+      Those frames are optionally wrapped in metadata tags, which hold no audio and are not frames:
     </p>
     <pre><code>[ID3v2 tag?] [frame][frame][frame] ... [frame] [ID3v1 tag?]</code></pre>
     <ul>
@@ -32,15 +50,22 @@
       </li>
       <li>
         <strong>Xing/Info/VBRI frame</strong> (optional): the first frame after ID3v2 may be a
-        metadata frame — a valid header whose payload holds encoder data instead of audio.
-        <code>"Xing"</code> (VBR) or <code>"Info"</code> (CBR, LAME) appears 36 bytes into the frame
-        for MPEG-1 stereo (4 header + 32 side-info bytes); <code>"VBRI"</code> at offset 36
-        regardless. Its count/byte fields describe the rest of the stream. Counting policy: see
+        metadata frame — structurally a real frame, but carrying a summary of the file written by
+        the encoder instead of audio. LAME, the most widely used MP3 encoder, writes
+        <code>"Xing"</code> into a variable-bitrate file and <code>"Info"</code> into a
+        constant-bitrate one. The marker sits 36 bytes into the frame for MPEG-1 stereo: past the
+        4-byte header and 32 bytes of <em>side information</em>, a block describing how that frame's
+        audio was packed. <code>"VBRI"</code> is a rarer variant, always at offset 36. Its stored
+        frame and byte counts describe the rest of the stream. Counting policy: see
         <a href="../decisions.md">decisions.md</a> D1.
       </li>
     </ul>
 
-    <h2>Frame header — 4 bytes, big-endian</h2>
+    <h2>The four-byte header</h2>
+    <p>
+      The fields below are packed into 32 bits, most significant first. The first eleven are all 1s
+      — the <strong>sync word</strong>, the pattern a reader looks for to find where a frame begins.
+    </p>
     <table>
       <tr>
         <th>Bits</th>
@@ -65,7 +90,7 @@
       <tr>
         <td>16</td>
         <td>CRC protection</td>
-        <td>either (affects payload, not length)</td>
+        <td>either — adds a checksum to the payload, but does not change the frame's length</td>
       </tr>
       <tr>
         <td>15–12</td>
