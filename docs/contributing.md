@@ -16,8 +16,8 @@ Two layers, and the dependency arrow only points one way.
   else receives a `Config`.
 - **`src/index.ts`** — builds the app and listens. Nothing else.
 
-Each file in `src/mp3/` opens with a pointer to the docs page explaining the
-format knowledge it encodes.
+Each file in `src/mp3/` opens with a summary of the format knowledge it
+encodes, written to stand on its own.
 
 ## Errors
 
@@ -44,7 +44,7 @@ Three independent layers, so a wrong answer points at exactly one of them:
 
 `test/` mirrors `src/`. **Never edit `expected-counts.json` to make a test
 pass** — it is ground truth from an outside tool; if the code disagrees with
-it, the code is wrong until proven otherwise in `DECISIONS.md`.
+it, the code is wrong until proven otherwise in `decisions.md`.
 
 ## Code style
 
@@ -55,10 +55,15 @@ it, the code is wrong until proven otherwise in `DECISIONS.md`.
 - `strict` TypeScript, plus `noUncheckedIndexedAccess` and
   `exactOptionalPropertyTypes`. Prefer `readonly` on data that never changes.
 - Neither code nor `docs/` refers to the build order — no "step 3", no pointer
-  to `PLAN.md`. A comment explains why the code is as it is, or states an
+  to the plan. A comment explains why the code is as it is, or states an
   invariant it holds; it never describes when the code was written or what a
-  later change will do to it. The sequence lives in `PLAN.md` and the git log,
+  later change will do to it. The sequence lives in `plan.md` and the git log,
   which are the only places it belongs.
+- Comments never cite a file path or a decision number. Nothing verifies such a
+  reference, so it rots silently when a document moves, and a reader should not
+  have to open another file to understand the code in front of them. State the
+  reason in the comment; `docs/` exists for the reader who wants the long
+  version, and `docs/index.html` is how they find it.
 
 ## Verify before done
 
@@ -73,14 +78,14 @@ and before calling any step complete.
 
 - `main` only; commit at every green state.
 - Messages: `step N: what changed`, imperative mood. Add a body only when the
-  commit embodies a decision, and reference `DECISIONS.md` when it does.
-- Every technical choice gets a `DECISIONS.md` row in the same commit that
+  commit embodies a decision, and reference `decisions.md` when it does.
+- Every technical choice gets a `decisions.md` row in the same commit that
   implements it.
 
 ## Documentation
 
 `docs/` is a knowledge log, not a diary: reference tone, no narrative, no first
-person. Reasoning lives in `DECISIONS.md` and is linked, never restated.
+person. Reasoning lives in `decisions.md` and is linked, never restated.
 
 - A **concept** page when domain knowledge is needed to write or review code.
 - An **evidence** page when something is measured with an outside tool.

@@ -93,28 +93,143 @@
         <text class="lbl" x="150" y="238">one JSON error shape</text>
       </svg>
       <figcaption>
-        Bytes are consumed chunk by chunk and never assembled into a whole-file buffer; every
-        failure, wherever it is raised, leaves through a single handler.
+        The upload arrives as a stream of chunks; every failure, wherever it is raised, leaves
+        through a single handler.
       </figcaption>
     </figure>
 
-    <h2>Why the upload streams</h2>
+    <h2>How the upload is read</h2>
     <p>
       <code>@fastify/multipart</code> exposes each part as a readable stream with a byte limit
-      applied by busboy. The handler consumes that stream to completion and hands each chunk to the
-      counter; nothing accumulates. Memory therefore stays flat regardless of file size, and an
-      oversized upload is rejected at the limit rather than after buffering. The part stream
-      <em>must</em> be drained even when its bytes are not needed — busboy will not finish parsing
-      the request, and the response will not be sent, while a part stream is still pending.
+      applied by busboy, so an oversized upload is refused at the limit rather than after the whole
+      body has been received. The part stream <em>must</em> be read to the end even when its bytes
+      are not needed: busboy will not finish parsing the request, and the response will not be sent,
+      while a part stream is still pending.
     </p>
+    <p>
+      What happens to those chunks is the difference between the two counter designs below. Both
+      return the same number for the same bytes; they differ in what has to be held in memory while
+      doing so.
+    </p>
+
+    <h2>v1 — buffer counter (current)</h2>
+    <p>
+      Chunks are collected until the upload ends, joined into one buffer, and counted in a single
+      pass. The counter indexes freely into the whole file, which makes the walk and the
+      resynchronisation logic straightforward to write and to test.
+    </p>
+
+    <h2>v2 — streaming counter</h2>
+    <p>
+      Each chunk is counted as it arrives. Only a few bytes survive between chunks: a partial header
+      split across a boundary, and how far into the current frame the reader is. A frame is decided
+      entirely by its own four-byte header, so nothing earlier in the file is needed to decide the
+      next step, and a frame that spans chunks is skipped by arithmetic rather than by being
+      assembled.
+    </p>
+
+    <figure>
+      <svg
+        viewBox="0 0 700 330"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="v1 accumulates every chunk into a whole-file buffer before counting; v2 counts each chunk on arrival and keeps only a few bytes of carried-over state"
+      >
+        <defs>
+          <marker id="head2" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
+          </marker>
+        </defs>
+
+        <text class="lbl" x="10" y="18">v1 — collect, then count</text>
+        <rect class="box" x="10" y="30" width="52" height="30" />
+        <text class="lbl" x="22" y="50">chunk</text>
+        <rect class="box" x="70" y="30" width="52" height="30" />
+        <text class="lbl" x="82" y="50">chunk</text>
+        <rect class="box" x="130" y="30" width="52" height="30" />
+        <text class="lbl" x="142" y="50">chunk</text>
+        <text class="lbl" x="190" y="50">…</text>
+
+        <path d="M36,62 L36,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <path d="M96,62 L60,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <path d="M156,62 L84,86" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+
+        <rect class="box" x="10" y="90" width="440" height="34" />
+        <text class="lbl" x="24" y="112">one buffer holding the entire file</text>
+        <path d="M456,107 L500,107" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <rect class="box" x="506" y="90" width="120" height="34" />
+        <rect class="hot" x="506" y="90" width="120" height="34" />
+        <text class="lbl" x="520" y="112">count once</text>
+        <text class="lbl" x="10" y="142">
+          peak memory grows with the file, up to MAX_UPLOAD_BYTES
+        </text>
+
+        <line x1="10" y1="165" x2="690" y2="165" stroke="currentColor" opacity="0.25" />
+
+        <text class="lbl" x="10" y="196">v2 — count as it arrives</text>
+        <rect class="box" x="10" y="208" width="52" height="30" />
+        <text class="lbl" x="22" y="228">chunk</text>
+        <rect class="box" x="70" y="208" width="52" height="30" />
+        <text class="lbl" x="82" y="228">chunk</text>
+        <rect class="box" x="130" y="208" width="52" height="30" />
+        <text class="lbl" x="142" y="228">chunk</text>
+        <text class="lbl" x="190" y="228">…</text>
+
+        <path d="M62,223 L68,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <path d="M122,223 L128,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+
+        <path d="M210,223 L250,223" stroke="currentColor" fill="none" marker-end="url(#head2)" />
+        <rect class="box" x="256" y="206" width="150" height="34" />
+        <rect class="hot" x="256" y="206" width="150" height="34" />
+        <text class="lbl" x="268" y="228">count on arrival</text>
+
+        <path
+          d="M331,242 C 331,270 331,270 331,276"
+          stroke="currentColor"
+          fill="none"
+          marker-end="url(#head2)"
+        />
+        <rect class="box" x="240" y="280" width="182" height="30" />
+        <text class="lbl" x="252" y="300">carried over: &lt; 4 bytes + offset</text>
+        <text class="lbl" x="440" y="300">peak memory is constant</text>
+      </svg>
+      <figcaption>
+        The counting rules are identical; only the amount of the file held at once differs.
+      </figcaption>
+    </figure>
+
+    <table>
+      <tr>
+        <th></th>
+        <th>v1 — buffer</th>
+        <th>v2 — streaming</th>
+      </tr>
+      <tr>
+        <th>Peak memory per request</th>
+        <td>Size of the upload, capped by <code>MAX_UPLOAD_BYTES</code> (200 MiB)</td>
+        <td>A few bytes, whatever the file size</td>
+      </tr>
+      <tr>
+        <th>Concurrent 200 MiB uploads</th>
+        <td>Each holds its own buffer; 10 at once is ~2 GiB</td>
+        <td>Cost is the same as one</td>
+      </tr>
+      <tr>
+        <th>Count available</th>
+        <td>After the last byte arrives</td>
+        <td>Continuously; final on the last byte</td>
+      </tr>
+      <tr>
+        <th>Counting rules</th>
+        <td colspan="2">Identical — same headers, same resynchronisation, same result</td>
+      </tr>
+    </table>
 
     <h2>Current state</h2>
     <p>
-      The transport layer is complete and the counting logic in <code>src/mp3/</code> is verified
-      against <code>mediainfo</code>, but the two are not yet joined: the route drains the upload
-      and answers <code>{ "frameCount": 0 }</code>. Connecting them changes neither the response
-      shape nor the error shape. Rationale for each choice is in
-      <a href="../decisions.md">decisions.md</a>.
+      The endpoint answers with a real count, verified against <code>mediainfo</code> for every file
+      in <code>test/fixtures/</code>. What remains is the memory behaviour above rather than
+      correctness. Rationale for each choice is in <a href="../decisions.md">decisions.md</a>.
     </p>
   </body>
 </html>

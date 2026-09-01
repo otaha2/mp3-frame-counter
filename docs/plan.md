@@ -12,7 +12,7 @@ like this list.
    mediainfo/ffprobe; byte-level inspection (ID3v2, first frame, Xing header,
    tail); concept + evidence pages in `docs/`.
    Exit: expected count recorded, "what is a frame count" decided
-   (DECISIONS.md D1).
+   (decisions.md D1).
 1. **Scaffold + walking skeleton.** Tooling (TS strict, ESLint, Prettier,
    Jest), conventions files, streaming `POST /file-upload` that drains the
    upload and returns a stubbed `{ "frameCount": 0 }`; typed-error shape
@@ -45,5 +45,5 @@ like this list.
    Exit: failure-path tests green; no client mistake reports as 5xx.
 
 6. **Wrap-up.** README (clone → run → test in under two minutes, exact curl
-   example), DECISIONS.md pass, future-work list, architecture + Q&A pages,
+   example), decisions.md pass, future-work list, architecture + Q&A pages,
    clean-clone verification, git log review.

@@ -1,9 +1,6 @@
 /**
  * Counting MPEG-1 Layer III frames in a complete buffer.
  *
- * The walk, and the rule used to re-establish sync after damage, are
- * documented in `docs/concepts/frame-counting.html`.
- *
  * The rules encoded here define what a frame count means for this service.
  * Any incremental implementation that reads the file in pieces must produce
  * identical results for identical bytes.

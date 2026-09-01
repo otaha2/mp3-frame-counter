@@ -1,8 +1,9 @@
 /**
  * ID3 tag boundaries.
  *
- * Tag layout, including the syncsafe size encoding, is documented in
- * `docs/concepts/mp3-structure.html`.
+ * An MP3 file may carry an ID3v2 tag before the frames and an ID3v1 tag after
+ * them. Neither is audio, and both contain arbitrary bytes that would be
+ * misread as frames if scanned.
  *
  * Tags are never parsed for their content: this module exists only to find
  * where the audio frames begin and end.

@@ -1,12 +1,10 @@
 /**
  * Detection of the Xing / Info / VBRI metadata frame.
  *
- * The frame's shape and why it is excluded from the count are documented in
- * `docs/concepts/mp3-structure.html` and `docs/decisions.md` D1.
- *
  * Such a frame is a structurally valid MPEG frame whose payload holds encoder
- * metadata instead of audio. Only its marker is read here; its stored counts
- * are deliberately not trusted as the answer.
+ * metadata instead of audio, so it is excluded from the reported count. Only
+ * its marker is read here; the frame counts it stores are deliberately not
+ * trusted as the answer, which must come from parsing the frames themselves.
  */
 
 import { HEADER_BYTES, type FrameHeader } from './frameHeader';

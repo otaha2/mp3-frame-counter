@@ -1,8 +1,9 @@
 /**
  * Parsing of the 4-byte MPEG audio frame header.
  *
- * Field layout, accepted values and the frame-length formula are documented in
- * `docs/concepts/mp3-structure.html`.
+ * A header packs the sync word, version, layer, bitrate, sampling rate and
+ * padding into 32 big-endian bits. Those fields alone determine how long the
+ * frame is, which is what lets a reader step from one frame to the next.
  *
  * Only MPEG Version 1, Layer III is accepted: every other version and layer is
  * out of scope for this service and is reported as "not a header".

@@ -4,10 +4,10 @@ An HTTP API that counts the audio frames in an uploaded MPEG-1 Audio Layer III
 file. Frames are counted by parsing the MP3 byte stream directly — no library
 does the parsing.
 
-> **Work in progress.** The endpoint, its error handling and the streaming
-> upload path are in place, and the frame counter is complete and checked
-> against `mediainfo`. The two are not yet connected, so the endpoint still
-> answers `{ "frameCount": 0 }`.
+> **Work in progress.** The endpoint returns a real frame count, verified
+> against `mediainfo` for every file in `test/fixtures/`. It currently buffers
+> each upload to count it; replacing that with an incremental counter, so
+> memory stays flat whatever the file size, is the outstanding work.
 
 ## Run it
 
@@ -27,7 +27,7 @@ curl -F "file=@test/fixtures/sample.mp3" http://localhost:3000/file-upload
 ```
 
 ```json
-{ "frameCount": 0 }
+{ "frameCount": 6089 }
 ```
 
 ## Test it
