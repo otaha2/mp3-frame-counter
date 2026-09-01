@@ -48,6 +48,15 @@ npm run verify
 
 Runs lint, format check, typecheck and the test suite.
 
+```bash
+npm run bench
+```
+
+Reproduces the memory and chunk-size measurements quoted in
+[the evidence pages](docs/evidence/streaming-memory.html): the same input counted
+by the current design and by the buffered one it replaced, and the sample counted
+at chunk sizes from one byte upwards.
+
 ## API
 
 ### `POST /file-upload`

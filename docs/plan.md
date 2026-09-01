@@ -6,6 +6,12 @@ counted by parsing frames ourselves, verified against mediainfo.
 Each step ends green (`npm run verify`) and committed. The git log should read
 like this list.
 
+**This is the plan as written before any code existed, kept unchanged.** All six
+steps are done. It is left in its original form because a plan rewritten to match
+the outcome is no longer a plan, and because where the work diverged from it, the
+divergence is the interesting part — see [what changed](#what-changed) at the end
+and the reasoning in [decisions.md](decisions.md).
+
 ## Steps
 
 0. **Ground truth & format study.** Expected count for the sample from
@@ -47,3 +53,19 @@ like this list.
 6. **Wrap-up.** README (clone → run → test in under two minutes, exact curl
    example), decisions.md pass, future-work list, architecture + Q&A pages,
    clean-clone verification, git log review.
+
+## What changed
+
+Three things in the list above are no longer true of the service, and each is a
+decision rather than an oversight.
+
+- **Step 1 fixes a `415 not multipart` error into the design.** That error no
+  longer exists. The endpoint accepts the MP3 as a raw request body as well as a
+  multipart part, so a body that is not multipart is read rather than refused,
+  and one that is not an MP3 is reported as such instead (D14, D15).
+- **Step 5 lists a two-file upload as a bug to fix.** It became a scope boundary
+  instead: several files in one request is a caller error, and the only promise
+  is that it never answers with a 5xx (D20).
+- **Steps 3 and 4 build two counters.** Only one survives. The whole-buffer
+  helper delegates to the streaming counter rather than duplicating the rules
+  (D16).
