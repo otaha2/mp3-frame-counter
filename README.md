@@ -69,12 +69,15 @@ inconsistently; the bytes decide whether it is an MP3.
 }
 ```
 
-| Status | `code`             | Cause                                                |
-| ------ | ------------------ | ---------------------------------------------------- |
-| 400    | `NO_FILE_UPLOADED` | Request carried no bytes                             |
-| 400    | `NO_FRAMES_FOUND`  | Bytes contained no MPEG-1 Layer III frames           |
-| 413    | `FILE_TOO_LARGE`   | Upload exceeded `MAX_UPLOAD_BYTES`                   |
-| 500    | `INTERNAL_ERROR`   | Unexpected failure; details are logged, not returned |
+| Status | `code`               | Cause                                                    |
+| ------ | -------------------- | -------------------------------------------------------- |
+| 400    | `NO_FILE_UPLOADED`   | Request carried no bytes                                 |
+| 400    | `NO_FRAMES_FOUND`    | Bytes contained no MPEG-1 Layer III frames               |
+| 400    | `UNREADABLE_UPLOAD`  | Multipart body malformed, or the upload ended early      |
+| 404    | `ROUTE_NOT_FOUND`    | No such path                                             |
+| 405    | `METHOD_NOT_ALLOWED` | Path exists under another method; see the `Allow` header |
+| 413    | `FILE_TOO_LARGE`     | Upload exceeded `MAX_UPLOAD_BYTES`                       |
+| 500    | `INTERNAL_ERROR`     | Unexpected failure; details are logged, not returned     |
 
 ## Handling large files
 
@@ -84,6 +87,32 @@ header and its position within the current frame. Streaming 208 MB through the
 counter grows the heap by 3.9 MB, and a 146 MB upload is answered in under a
 second with the server's resident memory essentially unchanged. `MAX_UPLOAD_BYTES`
 is therefore a policy limit on request size rather than a memory ceiling.
+
+## Scope
+
+The endpoint counts **one MPEG Version 1, Layer III file per request**. Some
+things sit deliberately outside that, and are named here rather than half-built:
+
+| Outside scope                         | What happens instead                                                                                                     |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| MPEG Version 2 / 2.5, Layers I and II | Rejected with `NO_FRAMES_FOUND`, naming the supported format                                                             |
+| Free-format bitrate (bitrate index 0) | Rejected: its frame length is not derivable from its own header, so the counter's jump-by-length approach does not apply |
+| More than one file in a request       | Not supported. The first file is read; the answer is not specified beyond the guarantee that it is never a `5xx`         |
+
+## Future work
+
+Given more time, in the order I would take them:
+
+- **Reject multi-file requests explicitly**, rather than leaving the answer
+  unspecified. Doing so deterministically means reading the whole request
+  before replying, since answering early resets a client that is still sending.
+- **Support free-format files** by measuring each frame to the next sync word,
+  which needs a different strategy from the current one.
+- **Bound the resynchronisation scan.** A large non-MP3 file is currently
+  scanned byte by byte before being rejected; giving up after a few hundred
+  kilobytes without a frame would refuse junk sooner.
+- **Report a partial count for a truncated file** alongside a flag, instead of
+  silently counting only the complete frames.
 
 ## Configuration
 
