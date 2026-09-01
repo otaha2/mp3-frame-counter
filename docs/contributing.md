@@ -77,8 +77,10 @@ and before calling any step complete.
 ## Git
 
 - `main` only; commit at every green state.
-- Messages: `step N: what changed`, imperative mood. Add a body only when the
-  commit embodies a decision, and reference `decisions.md` when it does.
+- Imperative mood. Work that belongs to a step in `plan.md` is prefixed
+  `step N:`; work that arises outside one is not forced into that shape.
+- Add a body only when the commit embodies a decision, and reference
+  `decisions.md` when it does.
 - Every technical choice gets a `decisions.md` row in the same commit that
   implements it.
 

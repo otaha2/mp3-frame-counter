@@ -4,6 +4,9 @@ An HTTP API that counts the audio frames in an uploaded MPEG-1 Audio Layer III
 file. Frames are counted by parsing the MP3 byte stream directly — no library
 does the parsing.
 
+Written in TypeScript and served by Fastify, with ESLint, Prettier and Jest
+for linting, formatting and tests.
+
 ## Run it
 
 Requires Node 20 or newer.
@@ -13,7 +16,7 @@ npm install
 npm run dev
 ```
 
-The server listens on port 3000 (override with `PORT`).
+The server listens on port 3000.
 
 ## Try it
 
@@ -35,6 +38,8 @@ Either way:
 { "frameCount": 6089 }
 ```
 
+That count is the one `mediainfo` reports for the same file.
+
 ## Test it
 
 ```bash
@@ -52,20 +57,16 @@ name — or as the raw request body. A non-multipart body is read as raw bytes
 whatever its `Content-Type` claims, because clients label binary payloads
 inconsistently; the bytes decide whether it is an MP3.
 
-**200**
+Responds `200` with `{ "frameCount": <number> }`.
 
-```json
-{ "frameCount": 6089 }
-```
-
-**Errors** all share one shape:
+Every error shares one shape:
 
 ```json
 {
-  "statusCode": 413,
-  "code": "FILE_TOO_LARGE",
-  "error": "Payload Too Large",
-  "message": "Uploaded file exceeds the maximum size of 209715200 bytes."
+  "statusCode": 400,
+  "code": "NO_FRAMES_FOUND",
+  "error": "Bad Request",
+  "message": "No MPEG Version 1 Layer III frames were found. The upload does not appear to be an MP3 file of that format."
 }
 ```
 
@@ -79,25 +80,49 @@ inconsistently; the bytes decide whether it is an MP3.
 | 413    | `FILE_TOO_LARGE`     | Upload exceeded `MAX_UPLOAD_BYTES`                       |
 | 500    | `INTERNAL_ERROR`     | Unexpected failure; details are logged, not returned     |
 
-## Handling large files
+## Configuration
 
-The upload is counted as it arrives and never held in memory: a frame declares
-its own length in its four-byte header, so the reader carries only a partial
-header and its position within the current frame. Streaming 208 MB through the
-counter grows the heap by 3.9 MB, and a 146 MB upload is answered in under a
-second with the server's resident memory essentially unchanged. `MAX_UPLOAD_BYTES`
-is therefore a policy limit on request size rather than a memory ceiling.
+| Variable           | Default               | Meaning                               |
+| ------------------ | --------------------- | ------------------------------------- |
+| `PORT`             | `3000`                | Listen port                           |
+| `HOST`             | `0.0.0.0`             | Listen address                        |
+| `MAX_UPLOAD_BYTES` | `209715200` (200 MiB) | Requests larger than this are refused |
 
 ## Scope
 
-The endpoint counts **one MPEG Version 1, Layer III file per request**. Some
-things sit deliberately outside that, and are named here rather than half-built:
+The endpoint counts **one MPEG Version 1, Layer III file per request**. These
+sit deliberately outside that, named here rather than half-built:
 
-| Outside scope                         | What happens instead                                                                                                     |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| MPEG Version 2 / 2.5, Layers I and II | Rejected with `NO_FRAMES_FOUND`, naming the supported format                                                             |
-| Free-format bitrate (bitrate index 0) | Rejected: its frame length is not derivable from its own header, so the counter's jump-by-length approach does not apply |
-| More than one file in a request       | Not supported. The first file is read; the answer is not specified beyond the guarantee that it is never a `5xx`         |
+| Outside scope                         | What happens instead                                                             |
+| ------------------------------------- | -------------------------------------------------------------------------------- |
+| MPEG Version 2 / 2.5, Layers I and II | Rejected with `NO_FRAMES_FOUND`, naming the supported format                     |
+| Free-format bitrate                   | Rejected: its length is not in its header, so the counter cannot step past it    |
+| More than one file in a request       | The first file is read; the only promise is that it is never answered with a 5xx |
+
+## Repository layout
+
+```
+src/mp3/     frame parsing and counting — Node builtins only, no framework
+src/http/    Fastify app, routes, typed errors, one error handler
+test/        mirrors src/; fixtures hold the MP3s and their verified counts
+docs/        the knowledge log
+```
+
+The dependency arrow points one way: `src/http/` knows about `src/mp3/`, never
+the reverse. The counter has no idea HTTP exists, which is why it can be tested
+with hand-built byte arrays and would drop into a CLI unchanged.
+
+## The docs directory
+
+`docs/` is a knowledge log rather than a manual. Most of the work here was
+learning how MP3 files are laid out, and that knowledge is worth writing down
+once rather than rediscovering. Pages come in three kinds — **concept** for
+domain knowledge, **evidence** for anything measured with an outside tool, and
+**model** for the shape of the system, which is where the scalability story
+lives. Reasoning is not repeated in them; it stays in
+[decisions.md](docs/decisions.md) and is linked.
+
+[docs/index.html](docs/index.html) is the only table of contents.
 
 ## Future work
 
@@ -114,18 +139,8 @@ Given more time, in the order I would take them:
 - **Report a partial count for a truncated file** alongside a flag, instead of
   silently counting only the complete frames.
 
-## Configuration
-
-| Variable           | Default               | Meaning                                 |
-| ------------------ | --------------------- | --------------------------------------- |
-| `PORT`             | `3000`                | Listen port                             |
-| `HOST`             | `0.0.0.0`             | Listen address                          |
-| `MAX_UPLOAD_BYTES` | `209715200` (200 MiB) | Rejected beyond this, without buffering |
-
 ## Further reading
 
 - [docs/decisions.md](docs/decisions.md) — every technical choice, with alternatives
-- [docs/contributing.md](docs/contributing.md) — conventions
-- [docs/plan.md](docs/plan.md) — build order and exit criteria
-- [docs/index.html](docs/index.html) — knowledge log: MP3 format, measurements,
-  architecture
+- [docs/contributing.md](docs/contributing.md) — conventions this repo follows
+- [docs/plan.md](docs/plan.md) — the build order the commit history follows

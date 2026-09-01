@@ -1,28 +1,15 @@
 # Agent notes
 
-Read `docs/contributing.md` first — it holds the conventions, and they are binding.
+- **No npm package may parse MP3 frame data.** That constraint is the exercise,
+  not an implementation detail. `src/mp3/` imports Node builtins only.
+- **`test/fixtures/expected-counts.json` is ground truth** from `mediainfo` and
+  `ffprobe`. When a test disagrees with it, the code is wrong. Never edit the
+  expectations to make a test pass.
+- **Run `npm run verify`** before saying any work is done.
+- **Neither code nor `docs/` mentions the build order** — no step numbers, no
+  pointers to the plan. A comment says why the code is as it is, or states an
+  invariant; never when it was written or what will replace it.
+- **Every technical choice gets a `docs/decisions.md` row**, and a docs page
+  lands in the same commit as the code it explains.
 
-## Guardrails
-
-- `src/mp3/` imports Node builtins only. Never Fastify, never `src/http/`,
-  never an npm package. No npm package may parse MP3 frame data: that is the
-  point of the exercise, not an implementation detail.
-- `test/fixtures/expected-counts.json` is ground truth from `mediainfo`.
-  Never edit it to make a test pass.
-- Run `npm run verify` before claiming any work is done. Do not commit red.
-- Never commit unprompted. Present the change for review and wait for approval.
-- Never mention the build order in code or docs pages: no step numbers, no
-  references to `docs/plan.md`, no notes about what a later change will replace.
-- Route handlers throw typed errors; they never set status codes.
-- One `docs/decisions.md` row per technical choice, in the same commit.
-- Docs pages land in the same commit as the code they explain.
-
-## Orientation
-
-| Path                | Holds                                                      |
-| ------------------- | ---------------------------------------------------------- |
-| `docs/plan.md`      | The build order and each step's exit criteria              |
-| `docs/decisions.md` | Why anything is the way it is                              |
-| `docs/index.html`   | Knowledge log: format concepts, measurements, architecture |
-| `src/mp3/`          | Frame parsing and counting (pure, dependency-free)         |
-| `src/http/`         | Fastify app, routes, typed errors, error handler           |
+`docs/contributing.md` holds the full conventions, written for a human reader.
