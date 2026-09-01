@@ -79,8 +79,10 @@
         one: a candidate is believed when a second header sits exactly one frame length further on.
         A single plausible header proves little, because eleven consecutive 1-bits occur readily
         inside compressed audio and inside unrelated files — without that second opinion a
-        photograph would appear to contain frames. A file with no frames at all is answered with a
-        400 naming the format that is supported, rather than a cheerful count of zero.
+        photograph would appear to contain frames. That is the real reason the rule exists: damaged
+        MP3s are rare, but telling an MP3 from anything else is the same problem, and the same check
+        does both. A file with no frames at all is answered with a 400 naming the format that is
+        supported, rather than a cheerful count of zero.
       </p>
       <p><a href="concepts/frame-counting.html">Why one sync word is not enough →</a></p>
     </details>

@@ -153,8 +153,13 @@
       countdown and a few undecided bytes.
     </p>
 
-    <h2>Watching it recover: a file with damage in the middle</h2>
-    <p>Four frames of 417 bytes each, with 35 bytes of rubbish injected after the second one.</p>
+    <h2>Watching it refuse to guess: unexpected bytes in the middle</h2>
+    <p>
+      Four frames of 417 bytes each, with 35 bytes of something else injected after the second one.
+      Damage is the clearest way to show this, though the same behaviour is what lets the counter
+      reject a file that is not an MP3 at all, and what carries it past trailing structures it does
+      not recognise.
+    </p>
     <table>
       <tr>
         <th>Position</th>

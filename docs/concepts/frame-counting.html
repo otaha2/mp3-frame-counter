@@ -73,7 +73,16 @@
       JPEG. The counter therefore trusts a candidate only once a second header sits exactly where
       the first one's declared length says it should — a coincidence that arbitrary data almost
       never produces. Once the chain is established each link is trusted on its own, so the check
-      costs nothing on undamaged files.
+      costs nothing on an undamaged file.
+    </p>
+    <p>
+      This is worth being clear about, because damaged MP3s are rare and nothing in this service's
+      requirements asks for them. The rule is not there to salvage broken files. It is there because
+      <em>rejecting something that is not an MP3 and recovering from damage are the same problem</em
+      >: both are a matter of never assuming that the next bytes are a frame. The same rule also
+      finds the first frame of a perfectly good file, since the counter begins every stream out of
+      sync, and it walks quietly past legal structures this parser does not know — an APEv2 tag at
+      the end of a file, or padding left by a tagger — instead of failing on them.
     </p>
 
     <figure>
