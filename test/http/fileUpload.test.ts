@@ -12,6 +12,7 @@ import type { FastifyInstance } from 'fastify';
 import { buildApp, type ErrorBody } from '../../src/http/app';
 import type { Config } from '../../src/config';
 import { FILE_FIELD_NAME, type FrameCountResponse } from '../../src/http/routes/fileUpload';
+import FormData from 'form-data';
 import { multipartFile, multipartWithoutFile } from '../helpers/multipart';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
@@ -19,6 +20,7 @@ const SAMPLE_PATH = join(FIXTURES, 'sample.mp3');
 
 interface ExpectedCounts {
   readonly files: Record<string, { readonly expectedFrameCount: number }>;
+  readonly edgeCases: Record<string, { readonly expectedFrameCount: number }>;
 }
 
 const groundTruth = JSON.parse(
@@ -219,12 +221,109 @@ describe('POST /file-upload', () => {
     );
   });
 
-  it('answers 404 in the standard error shape for an unknown route', async () => {
-    app = build();
+  describe('uploads the server cannot read', () => {
+    it('rejects a multipart body with no boundary', async () => {
+      app = build();
 
-    const response = await app.inject({ method: 'POST', url: '/nope' });
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        headers: { 'content-type': 'multipart/form-data' },
+        payload: readFileSync(SAMPLE_PATH),
+      });
 
-    expect(response.statusCode).toBe(404);
-    expect(response.headers['content-type']).toBe('application/json; charset=utf-8');
+      expect(response.statusCode).toBe(400);
+      expect(response.json<ErrorBody>()).toMatchObject({ code: 'UNREADABLE_UPLOAD' });
+    });
+
+    it('never answers a multi-file request with a server error', async () => {
+      // Sending several files is outside what this endpoint offers, so no
+      // particular answer is promised. What is promised is that the caller's
+      // mistake is never reported as a fault of the server's.
+      app = build();
+
+      const form = new FormData();
+      form.append('file', readFileSync(SAMPLE_PATH), { filename: 'a.mp3' });
+      form.append('second', readFileSync(join(FIXTURES, 'cbr-128-stereo-bare.mp3')), {
+        filename: 'b.mp3',
+      });
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        payload: form.getBuffer(),
+        headers: form.getHeaders(),
+      });
+
+      expect(response.statusCode).toBeLessThan(500);
+    });
+  });
+
+  describe('files that are not well formed', () => {
+    it('counts the complete frames of a truncated MP3', async () => {
+      app = build();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        ...multipartFile(
+          FILE_FIELD_NAME,
+          'truncated.mp3',
+          readFileSync(join(FIXTURES, 'truncated.mp3')),
+        ),
+      });
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json<FrameCountResponse>().frameCount).toBe(
+        groundTruth.edgeCases['truncated.mp3']?.expectedFrameCount,
+      );
+    });
+
+    it('rejects a real file of another format', async () => {
+      app = build();
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/file-upload',
+        ...multipartFile(
+          FILE_FIELD_NAME,
+          'not-audio.wav',
+          readFileSync(join(FIXTURES, 'not-audio.wav')),
+        ),
+      });
+
+      expect(response.statusCode).toBe(400);
+      expect(response.json<ErrorBody>()).toMatchObject({ code: 'NO_FRAMES_FOUND' });
+    });
+  });
+
+  describe('routing failures use the same error shape', () => {
+    it('answers 404 with a code for an unknown route', async () => {
+      app = build();
+
+      const response = await app.inject({ method: 'POST', url: '/nope' });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['content-type']).toBe('application/json; charset=utf-8');
+      expect(response.json<ErrorBody>()).toMatchObject({
+        statusCode: 404,
+        code: 'ROUTE_NOT_FOUND',
+        error: 'Not Found',
+      });
+    });
+
+    it('answers 405 with an Allow header when only the method is wrong', async () => {
+      app = build();
+
+      const response = await app.inject({ method: 'GET', url: '/file-upload' });
+
+      expect(response.statusCode).toBe(405);
+      expect(response.headers.allow).toBe('POST');
+      expect(response.json<ErrorBody>()).toMatchObject({
+        statusCode: 405,
+        code: 'METHOD_NOT_ALLOWED',
+      });
+      expect(response.json<ErrorBody>().message).toContain('POST');
+    });
   });
 });

@@ -10,8 +10,11 @@
 /** Machine-readable discriminators sent as the `code` field. */
 export const ErrorCode = {
   NoFileUploaded: 'NO_FILE_UPLOADED',
+  UnreadableUpload: 'UNREADABLE_UPLOAD',
   FileTooLarge: 'FILE_TOO_LARGE',
   NoFramesFound: 'NO_FRAMES_FOUND',
+  RouteNotFound: 'ROUTE_NOT_FOUND',
+  MethodNotAllowed: 'METHOD_NOT_ALLOWED',
   Internal: 'INTERNAL_ERROR',
 } as const;
 
@@ -22,8 +25,8 @@ export abstract class ApiError extends Error {
   abstract readonly statusCode: number;
   abstract readonly code: ErrorCode;
 
-  constructor(message: string) {
-    super(message);
+  constructor(message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = new.target.name;
   }
 }
@@ -54,6 +57,30 @@ export class NoFramesFoundError extends ApiError {
   constructor() {
     super(
       'No MPEG Version 1 Layer III frames were found. The upload does not appear to be an MP3 file of that format.',
+    );
+  }
+}
+
+/**
+ * The multipart body could not be read to the end.
+ *
+ * Covers a body with no boundary, a truncated one, and a second file part
+ * arriving where only one is accepted — busboy reports these as stream
+ * failures carrying no status, and all of them mean the caller sent something
+ * this endpoint cannot read.
+ */
+export class UnreadableUploadError extends ApiError {
+  readonly statusCode = 400;
+  readonly code = ErrorCode.UnreadableUpload;
+
+  /**
+   * @param cause - the underlying stream failure, kept so that a defect
+   * misclassified as a client error is still visible in the logs.
+   */
+  constructor(cause?: unknown) {
+    super(
+      'The upload could not be read. Send exactly one file in a well-formed multipart/form-data body, or the MP3 as the raw request body.',
+      { cause },
     );
   }
 }

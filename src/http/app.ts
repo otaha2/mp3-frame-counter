@@ -15,6 +15,9 @@ import type { Config } from '../config';
 import { ApiError, ErrorCode } from './errors';
 import { registerFileUploadRoute } from './routes/fileUpload';
 
+/** Methods checked when deciding whether a path exists under another verb. */
+const ROUTABLE_METHODS = ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS'] as const;
+
 /** The JSON body returned for every failure. Mirrors Fastify's own shape. */
 export interface ErrorBody {
   readonly statusCode: number;
@@ -31,7 +34,7 @@ function errorBody(statusCode: number, code: string, message: string): ErrorBody
   return { statusCode, code, error: statusText(statusCode), message };
 }
 
-/** Fallback `code` for a framework error that carries none: `PAYLOAD_TOO_LARGE`. */
+/** Fallback `code` for a framework error that carries none, from its status name. */
 function codeFromStatus(statusCode: number): string {
   return statusText(statusCode).toUpperCase().replace(/\s+/g, '_');
 }
@@ -49,6 +52,8 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
   // service never wants decoded, so they are replaced by the catch-all below.
   app.removeAllContentTypeParsers();
 
+  // One file per request: this endpoint counts one MP3, and declaring the
+  // limit here keeps the route from having to police it.
   void app.register(multipart, {
     limits: {
       fileSize: config.maxUploadBytes,
@@ -70,6 +75,13 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
     if (error instanceof ApiError) {
+      // A client error that wraps something else keeps that cause out of the
+      // response but not out of the logs, so a defect misreported as a client
+      // mistake can still be found.
+      if (error.cause !== undefined) {
+        request.log.warn({ err: error.cause }, 'upload rejected; underlying cause');
+      }
+
       return reply
         .status(error.statusCode)
         .send(errorBody(error.statusCode, error.code, error.message));
@@ -90,6 +102,32 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
     return reply
       .status(500)
       .send(errorBody(500, ErrorCode.Internal, 'An unexpected error occurred.'));
+  });
+
+  // Fastify renders a missing route through its own handler, which would
+  // otherwise be the one response in this API without a `code`. A known path
+  // reached by the wrong method is answered 405 rather than 404, since the
+  // resource exists and only the method is wrong.
+  app.setNotFoundHandler((request, reply) => {
+    const path = request.url.split('?')[0] ?? request.url;
+    const allowed = ROUTABLE_METHODS.filter((method) => app.hasRoute({ method, url: path }));
+
+    if (allowed.length > 0) {
+      return reply
+        .status(405)
+        .header('Allow', allowed.join(', '))
+        .send(
+          errorBody(
+            405,
+            ErrorCode.MethodNotAllowed,
+            `${request.method} is not supported for ${path}. Use ${allowed.join(' or ')}.`,
+          ),
+        );
+    }
+
+    return reply
+      .status(404)
+      .send(errorBody(404, ErrorCode.RouteNotFound, `No route exists for ${path}.`));
   });
 
   registerFileUploadRoute(app, config);

@@ -11,15 +11,15 @@ import { frame, frameLength, id3v1Tag, id3v2Tag, metadataFrame } from '../helper
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
 
+interface FixtureExpectation {
+  readonly expectedFrameCount: number;
+  readonly physicalFrames: number;
+  readonly metadataFrame: string | null;
+}
+
 interface ExpectedCounts {
-  readonly files: Record<
-    string,
-    {
-      readonly expectedFrameCount: number;
-      readonly physicalFrames: number;
-      readonly metadataFrame: string | null;
-    }
-  >;
+  readonly files: Record<string, FixtureExpectation>;
+  readonly edgeCases: Record<string, FixtureExpectation>;
 }
 
 const groundTruth = JSON.parse(
@@ -149,5 +149,29 @@ describe('countFrames against mediainfo ground truth', () => {
     expect(result.physicalFrames).toBe(expected.physicalFrames);
     expect(result.hasVbrMetadataFrame).toBe(expected.metadataFrame !== null);
     expect(result.resyncedBytes).toBe(0);
+  });
+});
+
+describe('countFrames on files that are not well formed', () => {
+  it('counts only the complete frames of a truncated file', () => {
+    // The reference tools disagree here: mediainfo repeats the Xing header's
+    // declared 6089, describing a file that no longer exists, and ffprobe
+    // counts the final frame it began reading even though 234 of its 261
+    // bytes are missing.
+    const expected = groundTruth.edgeCases['truncated.mp3'];
+    if (expected === undefined) throw new Error('no ground truth for truncated.mp3');
+
+    const result = countFrames(readFileSync(join(FIXTURES, 'truncated.mp3')));
+
+    expect(result.frameCount).toBe(expected.expectedFrameCount);
+    expect(result.physicalFrames).toBe(expected.physicalFrames);
+    expect(result.resyncedBytes).toBe(0);
+  });
+
+  it('finds no frames in a real file of another format', () => {
+    const result = countFrames(readFileSync(join(FIXTURES, 'not-audio.wav')));
+
+    expect(result.frameCount).toBe(0);
+    expect(result.physicalFrames).toBe(0);
   });
 });

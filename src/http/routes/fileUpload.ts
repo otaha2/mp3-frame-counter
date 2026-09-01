@@ -14,7 +14,13 @@ import type { Readable } from 'node:stream';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import type { Config } from '../../config';
 import { FrameCounter } from '../../mp3/frameCounter';
-import { FileTooLargeError, NoFileUploadedError, NoFramesFoundError } from '../errors';
+import {
+  ApiError,
+  FileTooLargeError,
+  NoFileUploadedError,
+  NoFramesFoundError,
+  UnreadableUploadError,
+} from '../errors';
 
 /**
  * Field name used in the documentation and examples. The route accepts a file
@@ -43,20 +49,37 @@ async function countStream(source: Readable, maxBytes: number): Promise<UploadOu
   const counter = new FrameCounter();
   let bytesRead = 0;
 
-  for await (const chunk of source as AsyncIterable<Buffer>) {
-    bytesRead += chunk.length;
-    if (bytesRead > maxBytes) {
-      throw new FileTooLargeError(maxBytes);
+  try {
+    for await (const chunk of source as AsyncIterable<Buffer>) {
+      bytesRead += chunk.length;
+      if (bytesRead > maxBytes) {
+        throw new FileTooLargeError(maxBytes);
+      }
+      counter.update(chunk);
     }
-    counter.update(chunk);
+  } catch (cause) {
+    // Limits raised above are already the right answer.
+    if (cause instanceof ApiError) throw cause;
+
+    // Anything else means the bytes stopped arriving: a body with no
+    // boundary, a second file part, or a client that went away. None of
+    // those are server faults, so none should be reported as one.
+    throw new UnreadableUploadError(cause);
   }
 
   return { frameCount: counter.end().frameCount, bytesRead };
 }
 
-/** Reads the single file part of a multipart request. */
+/** Counts the file part of a multipart request. */
 async function countMultipartFile(request: FastifyRequest, config: Config): Promise<UploadOutcome> {
-  const part = await request.file();
+  let part;
+  try {
+    // A body with no boundary fails here, before any part exists to read.
+    part = await request.file();
+  } catch (cause) {
+    throw new UnreadableUploadError(cause);
+  }
+
   if (part === undefined) {
     throw new NoFileUploadedError(FILE_FIELD_NAME);
   }

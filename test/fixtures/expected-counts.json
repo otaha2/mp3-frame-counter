@@ -44,5 +44,22 @@
       "ffprobeReadFrames": 116,
       "notes": "128-byte ID3v1 tail appended by hand; mediainfo reads its title, confirming the tag is well formed. Both tools agree."
     }
+  },
+  "_edgeCases": "Files that are not well-formed MP3s. Kept apart from `files` because the reference tools disagree about them, and because a count is not the expected outcome for all of them.",
+  "edgeCases": {
+    "truncated.mp3": {
+      "expectedFrameCount": 95,
+      "physicalFrames": 96,
+      "metadataFrame": "Xing",
+      "mediainfoFrameCount": 6089,
+      "ffprobeReadFrames": 96,
+      "notes": "The first 20000 bytes of sample.mp3. 96 complete physical frames end at byte 19973; a 97th declares 261 bytes but only 27 are present. The three answers differ for understandable reasons: mediainfo reports the Xing header’s declared 6089 and so describes a file that no longer exists; ffprobe counts the incomplete 97th frame it began reading; this service counts only frames whose bytes are all present, giving 96 physical minus the Xing frame."
+    },
+    "not-audio.wav": {
+      "expectedFrameCount": 0,
+      "physicalFrames": 0,
+      "metadataFrame": null,
+      "notes": "A real WAV file produced by ffmpeg, used instead of synthetic junk so the rejection is tested against a genuine container with its own header. No frames means the endpoint answers 400 NO_FRAMES_FOUND rather than a count."
+    }
   }
 }
