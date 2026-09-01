@@ -126,23 +126,39 @@ lives. Reasoning is not repeated in them; it stays in
 
 ## Future work
 
-Given more time, in the order I would take them:
+Roughly in the order I would take them.
 
-- **Reject multi-file requests explicitly**, rather than leaving the answer
-  unspecified. Doing so deterministically means reading the whole request
-  before replying, since answering early resets a client that is still sending.
-- **Support free-format files** by measuring each frame to the next sync word,
-  which needs a different strategy from the current one.
 - **Limit how many uploads run at once.** Memory per request is flat, but
-  nothing caps concurrency; counting is CPU-bound and single-threaded, so past
-  roughly 800 MB/s of aggregate throughput further requests add latency rather
-  than throughput. A queue or connection limit would make that degradation
-  orderly rather than uniform.
-- **Bound the resynchronisation scan.** A large non-MP3 file is currently
-  scanned byte by byte before being rejected; giving up after a few hundred
-  kilobytes without a frame would refuse junk sooner.
-- **Report a partial count for a truncated file** alongside a flag, instead of
-  silently counting only the complete frames.
+  nothing caps concurrency, and the counting itself runs on a single thread.
+  Past roughly 800 MB/s of combined throughput, extra requests make everyone
+  slower rather than getting more done. A queue or a connection limit would make
+  that slowdown orderly instead of spreading it across every caller.
+
+- **Give up sooner on a file that is not an MP3.** When an upload turns out to
+  be something else, the counter looks for a frame starting at every single
+  byte before concluding there are none — so a 200 MB file of the wrong kind is
+  read from beginning to end before it is refused. Stopping after a few hundred
+  kilobytes without a single frame would reject it almost immediately.
+
+- **Say when a file was cut short.** A file that ends part-way through — an
+  interrupted download, say — is counted as far as it goes, and the response
+  looks exactly like one for a complete file. Returning the count alongside a
+  flag saying the audio stopped mid-frame would let a caller tell the
+  difference.
+
+- **Refuse multi-file uploads outright.** Sending two files in one request
+  currently gets an answer about the first, and the only guarantee is that the
+  reply is not a server error. Saying plainly that one file is expected would be
+  clearer. The catch is that a server which answers while the client is still
+  uploading causes the client to see a broken connection, so refusing properly
+  means reading the whole request first — paying for bytes that should never
+  have been sent.
+
+- **Accept free-format files.** A rare kind of MP3 leaves the bitrate out of
+  each frame header, which means there is no way to calculate where the next
+  frame begins. Those files are rejected today. Supporting them needs a second
+  way of reading a file — searching for each following frame rather than
+  stepping straight to it — alongside the method already here.
 
 ## Further reading
 
