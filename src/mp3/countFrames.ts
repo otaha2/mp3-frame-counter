@@ -4,8 +4,9 @@
  * The walk, and the rule used to re-establish sync after damage, are
  * documented in `docs/concepts/frame-counting.html`.
  *
- * Step 4 replaces this with a resumable state machine that consumes chunks;
- * the counting rules below are the specification that machine must match.
+ * The rules encoded here define what a frame count means for this service.
+ * Any incremental implementation that reads the file in pieces must produce
+ * identical results for identical bytes.
  */
 
 import { HEADER_BYTES, parseFrameHeader, type FrameHeader } from './frameHeader';

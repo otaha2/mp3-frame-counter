@@ -35,11 +35,10 @@ export function registerFileUploadRoute(app: FastifyInstance, config: Config): v
     }
 
     // The part stream must be consumed to completion even when its contents
-    // are not needed yet: busboy will not finish parsing the request — and the
+    // are not needed: busboy will not finish parsing the request — and the
     // response will not be sent — while a part stream is still pending.
-    // Step 4 replaces this drain with the streaming frame counter.
     for await (const _chunk of part.file) {
-      // Intentionally empty: bytes are discarded until the counter lands.
+      // Bytes are discarded; the frame counter is not connected here yet.
     }
 
     // busboy stops at the limit rather than buffering the rest, so truncation

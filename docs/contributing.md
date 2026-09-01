@@ -54,6 +54,11 @@ it, the code is wrong until proven otherwise in `DECISIONS.md`.
   (`SAMPLES_PER_FRAME`, not `1152`).
 - `strict` TypeScript, plus `noUncheckedIndexedAccess` and
   `exactOptionalPropertyTypes`. Prefer `readonly` on data that never changes.
+- Neither code nor `docs/` refers to the build order — no "step 3", no pointer
+  to `PLAN.md`. A comment explains why the code is as it is, or states an
+  invariant it holds; it never describes when the code was written or what a
+  later change will do to it. The sequence lives in `PLAN.md` and the git log,
+  which are the only places it belongs.
 
 ## Verify before done
 

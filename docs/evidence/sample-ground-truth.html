@@ -10,7 +10,8 @@
     <h1>Sample ground truth</h1>
     <p class="scope">
       Measured facts about <code>test/fixtures/sample.mp3</code> from outside tools; informs
-      <code>test/fixtures/expected-counts.json</code> and DECISIONS.md D1.
+      <code>test/fixtures/expected-counts.json</code> and
+      <a href="../decisions.md">decisions.md</a> D1.
     </p>
 
     <h2>File identity</h2>
@@ -152,8 +153,8 @@
       </tr>
     </table>
     <p>
-      Re-run with <code>src/mp3/frameHeader.ts</code> after step 2: identical totals, and the frames
-      tile to byte 1,458,172 — the exact end of the file.
+      <code>src/mp3/frameHeader.ts</code> reproduces these totals exactly, and the frames tile to
+      byte 1,458,172 — the precise end of the file.
     </p>
 
     <h2>Generated fixtures</h2>
@@ -224,7 +225,7 @@
       mediainfo is therefore not self-consistent across the two files: it appears to read the
       declared field for a variable-bitrate stream and to count frames itself for a constant one.
       ffprobe excludes the metadata frame in both cases, as does each file's own header field. This
-      service follows the consistent reading — see DECISIONS.md D11.
+      service follows the consistent reading — see <a href="../decisions.md">decisions.md</a> D11.
     </p>
 
     <h2>The discrepancy, resolved</h2>
@@ -232,13 +233,14 @@
       Physical walk: <strong>6090</strong>. mediainfo, ffprobe, and the file's own Xing field:
       <strong>6089</strong>. The difference is exactly frame 1 — the Xing metadata frame, which is a
       validly-shaped frame carrying no audio. Reference tools exclude it; the Xing field's byte
-      count (which <em>includes</em>
-      its own frame) confirms the count field describes the frames after it. The channel-mode split
-      is a fourth, independent witness to the same boundary: the metadata frame declares stereo
-      while all 6089 audio frames declare joint stereo. Decision: report 6089-style counts —
-      physical frames minus a detected Xing/Info/VBRI frame (DECISIONS.md D1). Expected count for
-      this file:
-      <mark>6089</mark>.
+      count (which <em>includes</em> its own frame) confirms the count field describes the frames
+      after it. The channel-mode split is a fourth, independent witness to the same boundary: the
+      metadata frame declares stereo while all 6089 audio frames declare joint stereo. Decision:
+      report 6089-style counts — physical frames minus a detected Xing/Info/VBRI frame (<a
+        href="../decisions.md"
+        >decisions.md</a
+      >
+      D1). Expected count for this file: <mark>6089</mark>.
     </p>
   </body>
 </html>

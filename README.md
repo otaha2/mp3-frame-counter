@@ -4,9 +4,10 @@ An HTTP API that counts the audio frames in an uploaded MPEG-1 Audio Layer III
 file. Frames are counted by parsing the MP3 byte stream directly — no library
 does the parsing.
 
-> **Status: step 1 of 6.** The endpoint, error handling and streaming upload
-> path are real; the frame count is currently stubbed at `0`. See
-> [PLAN.md](PLAN.md).
+> **Work in progress.** The endpoint, its error handling and the streaming
+> upload path are in place, and the frame counter is complete and checked
+> against `mediainfo`. The two are not yet connected, so the endpoint still
+> answers `{ "frameCount": 0 }`.
 
 ## Run it
 
@@ -77,8 +78,8 @@ Accepts `multipart/form-data` with the MP3 in a field named `file`.
 
 ## Further reading
 
-- [PLAN.md](PLAN.md) — build order and exit criteria
-- [DECISIONS.md](DECISIONS.md) — every technical choice, with alternatives
-- [CONTRIBUTING.md](CONTRIBUTING.md) — conventions
+- [docs/decisions.md](docs/decisions.md) — every technical choice, with alternatives
+- [docs/contributing.md](docs/contributing.md) — conventions
+- [docs/plan.md](docs/plan.md) — build order and exit criteria
 - [docs/index.html](docs/index.html) — knowledge log: MP3 format, measurements,
   architecture

@@ -13,8 +13,8 @@
     "start": "node dist/index.js",
     "test": "jest",
     "lint": "eslint .",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
+    "format": "prettier --write . --ignore-path .gitignore",
+    "format:check": "prettier --check . --ignore-path .gitignore",
     "typecheck": "tsc --noEmit",
     "verify": "npm run lint && npm run format:check && npm run typecheck && npm test"
   },
@@ -35,5 +35,24 @@
     "tsx": "^4.0.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.68.0"
+  },
+  "prettier": {
+    "singleQuote": true,
+    "printWidth": 100,
+    "trailingComma": "all"
+  },
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "roots": [
+      "<rootDir>/test"
+    ],
+    "testMatch": [
+      "**/*.test.ts"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.ts"
+    ],
+    "clearMocks": true
   }
 }

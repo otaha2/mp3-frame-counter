@@ -1,6 +1,6 @@
 {
   "_source": "mediainfo 26.05 (MediaInfoLib v26.05) and ffprobe 9.0.1. Structural columns confirmed by byte inspection (od). GROUND TRUTH: never edit these numbers to make a test pass.",
-  "_reading": "expectedFrameCount is the value this API must return. Where mediainfo and ffprobe disagree, see DECISIONS.md D11 and docs/evidence/sample-ground-truth.html.",
+  "_reading": "expectedFrameCount is the value this API must return. Where mediainfo and ffprobe disagree, see docs/decisions.md D11 and docs/evidence/sample-ground-truth.html.",
   "files": {
     "sample.mp3": {
       "expectedFrameCount": 6089,

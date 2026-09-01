@@ -26,13 +26,10 @@ export default tseslint.config(
     },
   },
   {
-    // Config files are plain CommonJS and outside the TypeScript project.
-    files: ['**/*.mjs', '**/*.js'],
+    // This config file is ESM and sits outside the TypeScript project, so the
+    // type-aware rules cannot apply to it.
+    files: ['**/*.mjs'],
     ...tseslint.configs.disableTypeChecked,
-    languageOptions: {
-      sourceType: 'commonjs',
-      globals: { module: 'writable', require: 'readonly', __dirname: 'readonly' },
-    },
   },
   prettier,
 );

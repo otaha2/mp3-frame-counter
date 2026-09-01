@@ -110,10 +110,11 @@
 
     <h2>Current state</h2>
     <p>
-      Step 1 wires the whole path with the counter stubbed: the route drains the upload and returns
-      <code>{ "frameCount": 0 }</code>. Steps 2–4 fill in <code>src/mp3/</code> and replace the
-      stub; the response and error shapes do not change. Rationale for each choice is in
-      <code>DECISIONS.md</code>.
+      The transport layer is complete and the counting logic in <code>src/mp3/</code> is verified
+      against <code>mediainfo</code>, but the two are not yet joined: the route drains the upload
+      and answers <code>{ "frameCount": 0 }</code>. Connecting them changes neither the response
+      shape nor the error shape. Rationale for each choice is in
+      <a href="../decisions.md">decisions.md</a>.
     </p>
   </body>
 </html>
