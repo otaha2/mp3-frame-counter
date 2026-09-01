@@ -1,6 +1,6 @@
 /** Unit tests for locating the ID3 tag boundaries around the audio. */
 
-import { audioRegion, hasId3v1Tag, id3v2TagSizeBytes } from '../../src/mp3/tags';
+import { hasId3v1Tag, id3v2TagSizeBytes } from '../../src/mp3/tags';
 import { id3v1Tag, id3v2Tag } from '../helpers/mp3';
 
 describe('id3v2TagSizeBytes', () => {
@@ -44,23 +44,5 @@ describe('hasId3v1Tag', () => {
 
   it('ignores the marker anywhere but the final 128 bytes', () => {
     expect(hasId3v1Tag(Buffer.concat([id3v1Tag(), Buffer.alloc(500)]))).toBe(false);
-  });
-});
-
-describe('audioRegion', () => {
-  it('spans the whole file when there are no tags', () => {
-    expect(audioRegion(Buffer.alloc(1000))).toEqual({ start: 0, end: 1000 });
-  });
-
-  it('excludes both tags', () => {
-    const bytes = Buffer.concat([id3v2Tag(Buffer.alloc(34)), Buffer.alloc(1000), id3v1Tag()]);
-
-    expect(audioRegion(bytes)).toEqual({ start: 44, end: 1044 });
-  });
-
-  it('ignores a tag that claims to be larger than the file', () => {
-    const bytes = id3v2Tag(Buffer.alloc(5000)).subarray(0, 100);
-
-    expect(audioRegion(bytes)).toEqual({ start: 0, end: 100 });
   });
 });

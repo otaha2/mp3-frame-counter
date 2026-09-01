@@ -10,7 +10,7 @@
  */
 
 /** Fixed size of the ID3v2 header that precedes the tag body. */
-const ID3V2_HEADER_BYTES = 10;
+export const ID3V2_HEADER_BYTES = 10;
 
 /** `ID3v2.4` may append a copy of the header at the end of the tag. */
 const ID3V2_FOOTER_BYTES = 10;
@@ -19,19 +19,11 @@ const ID3V2_FOOTER_BYTES = 10;
 const ID3V2_FOOTER_FLAG = 0x10;
 
 /** An ID3v1 tag is always exactly this long and always ends the file. */
-const ID3V1_TAG_BYTES = 128;
+export const ID3V1_TAG_BYTES = 128;
 
 /** Syncsafe integers use only the low seven bits of each byte. */
 const SYNCSAFE_BITS = 7;
 const SYNCSAFE_MAX_BYTE = 0x7f;
-
-/** The span of a file that may contain audio frames. */
-export interface AudioRegion {
-  /** Offset of the first byte that may begin a frame. */
-  readonly start: number;
-  /** Offset one past the last byte available to frames. */
-  readonly end: number;
-}
 
 /**
  * Total bytes occupied by a leading ID3v2 tag, or 0 if there is none.
@@ -62,18 +54,4 @@ export function hasId3v1Tag(bytes: Buffer): boolean {
   if (bytes.length < ID3V1_TAG_BYTES) return false;
   const tagStart = bytes.length - ID3V1_TAG_BYTES;
   return bytes.subarray(tagStart, tagStart + 3).toString('latin1') === 'TAG';
-}
-
-/**
- * The region of `bytes` between the tags, where frames may be found.
- *
- * A tag that claims to be larger than the file is ignored rather than trusted,
- * which would otherwise produce an empty region and a count of zero.
- */
-export function audioRegion(bytes: Buffer): AudioRegion {
-  const declaredStart = id3v2TagSizeBytes(bytes);
-  const start = declaredStart > bytes.length ? 0 : declaredStart;
-  const end = bytes.length - (hasId3v1Tag(bytes) ? ID3V1_TAG_BYTES : 0);
-
-  return { start, end: Math.max(start, end) };
 }

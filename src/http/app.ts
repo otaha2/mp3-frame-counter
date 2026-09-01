@@ -12,11 +12,8 @@ import Fastify, {
   type FastifyServerOptions,
 } from 'fastify';
 import type { Config } from '../config';
-import { ApiError, ErrorCode, FileTooLargeError } from './errors';
+import { ApiError, ErrorCode } from './errors';
 import { registerFileUploadRoute } from './routes/fileUpload';
-
-/** Fastify's code for a raw body that exceeded `bodyLimit`. */
-const FASTIFY_BODY_TOO_LARGE = 'FST_ERR_CTP_BODY_TOO_LARGE';
 
 /** The JSON body returned for every failure. Mirrors Fastify's own shape. */
 export interface ErrorBody {
@@ -46,14 +43,10 @@ function codeFromStatus(statusCode: number): string {
  * @param options - Fastify options, used by tests to silence logging.
  */
 export function buildApp(config: Config, options: FastifyServerOptions = {}): FastifyInstance {
-  const app = Fastify({
-    // Applies to a raw body; the multipart plugin enforces its own file limit.
-    bodyLimit: config.maxUploadBytes,
-    ...options,
-  });
+  const app = Fastify(options);
 
-  // The built-in JSON and text parsers would decode a body this service never
-  // wants decoded, so they are replaced by the catch-all below.
+  // The built-in JSON and text parsers would buffer and decode a body this
+  // service never wants decoded, so they are replaced by the catch-all below.
   app.removeAllContentTypeParsers();
 
   void app.register(multipart, {
@@ -67,22 +60,19 @@ export function buildApp(config: Config, options: FastifyServerOptions = {}): Fa
   // body. Everything that is not multipart is taken as raw bytes, whatever the
   // Content-Type claims: clients are inconsistent about labelling a binary
   // body — curl's --data-binary defaults to application/x-www-form-urlencoded
-  // — and the bytes themselves settle whether this is an MP3. A body that does
-  // not parse as MPEG-1 Layer III is reported as such by the route.
-  app.addContentTypeParser('*', { parseAs: 'buffer' }, (_request, body, done) => {
-    done(null, body);
+  // — and the bytes themselves settle whether this is an MP3.
+  //
+  // The body is deliberately left unread here so that the route can count it
+  // as it arrives; buffering it first would defeat that.
+  app.addContentTypeParser('*', (_request, _payload, done) => {
+    done(null, undefined);
   });
 
   app.setErrorHandler((error: FastifyError, request, reply) => {
-    // An oversized raw body is rejected by Fastify and an oversized part by
-    // busboy; to a client they are one condition, so they report as one.
-    const failure =
-      error.code === FASTIFY_BODY_TOO_LARGE ? new FileTooLargeError(config.maxUploadBytes) : error;
-
-    if (failure instanceof ApiError) {
+    if (error instanceof ApiError) {
       return reply
-        .status(failure.statusCode)
-        .send(errorBody(failure.statusCode, failure.code, failure.message));
+        .status(error.statusCode)
+        .send(errorBody(error.statusCode, error.code, error.message));
     }
 
     // Errors raised by Fastify or its plugins already carry a status; a
