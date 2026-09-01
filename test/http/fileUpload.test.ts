@@ -14,7 +14,16 @@ import type { Config } from '../../src/config';
 import { FILE_FIELD_NAME, type FrameCountResponse } from '../../src/http/routes/fileUpload';
 import { multipartFile, multipartWithoutFile } from '../helpers/multipart';
 
-const SAMPLE_PATH = join(__dirname, '..', 'fixtures', 'sample.mp3');
+const FIXTURES = join(__dirname, '..', 'fixtures');
+const SAMPLE_PATH = join(FIXTURES, 'sample.mp3');
+
+interface ExpectedCounts {
+  readonly files: Record<string, { readonly expectedFrameCount: number }>;
+}
+
+const groundTruth = JSON.parse(
+  readFileSync(join(FIXTURES, 'expected-counts.json'), 'utf8'),
+) as ExpectedCounts;
 
 const testConfig: Config = {
   port: 0,
@@ -33,7 +42,7 @@ describe('POST /file-upload', () => {
     await app.close();
   });
 
-  it('accepts an MP3 upload and answers with a frame count', async () => {
+  it('answers with the sample’s verified frame count', async () => {
     app = build();
     const sample = readFileSync(SAMPLE_PATH);
 
@@ -48,7 +57,22 @@ describe('POST /file-upload', () => {
 
     const body = response.json<FrameCountResponse>();
     expect(Object.keys(body)).toEqual(['frameCount']);
-    expect(typeof body.frameCount).toBe('number');
+    expect(body.frameCount).toBe(groundTruth.files['sample.mp3']?.expectedFrameCount);
+  });
+
+  it.each(Object.keys(groundTruth.files))('reports the recorded count for %s', async (name) => {
+    app = build();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/file-upload',
+      ...multipartFile(FILE_FIELD_NAME, name, readFileSync(join(FIXTURES, name))),
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json<FrameCountResponse>().frameCount).toBe(
+      groundTruth.files[name]?.expectedFrameCount,
+    );
   });
 
   it('rejects a multipart request that carries no file', async () => {

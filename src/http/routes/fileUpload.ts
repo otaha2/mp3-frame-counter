@@ -7,6 +7,7 @@
 
 import type { FastifyInstance } from 'fastify';
 import type { Config } from '../../config';
+import { countFrames } from '../../mp3/countFrames';
 import { FileTooLargeError, NoFileUploadedError, UnsupportedMediaTypeError } from '../errors';
 
 /**
@@ -34,19 +35,28 @@ export function registerFileUploadRoute(app: FastifyInstance, config: Config): v
       throw new NoFileUploadedError(FILE_FIELD_NAME);
     }
 
-    // The part stream must be consumed to completion even when its contents
-    // are not needed: busboy will not finish parsing the request — and the
-    // response will not be sent — while a part stream is still pending.
-    for await (const _chunk of part.file) {
-      // Bytes are discarded; the frame counter is not connected here yet.
+    // The part must be read to the end before the response can be sent:
+    // busboy will not finish parsing the request while a part stream is
+    // still pending.
+    //
+    // The counter reads a complete buffer, so the chunks are collected rather
+    // than measured as they arrive. Peak memory is one upload, bounded by the
+    // configured limit; counting itself needs no buffer, since a frame is
+    // decided by its own four-byte header.
+    // The part stream is a Node readable in binary mode, which always yields
+    // Buffers; its declared element type is `any`, so it is narrowed here.
+    const chunks: Buffer[] = [];
+    for await (const chunk of part.file as AsyncIterable<Buffer>) {
+      chunks.push(chunk);
     }
 
-    // busboy stops at the limit rather than buffering the rest, so truncation
-    // is reported as a flag once the stream ends.
+    // busboy stops reading at the limit rather than buffering the rest, so
+    // truncation is reported as a flag once the stream ends.
     if (part.file.truncated) {
       throw new FileTooLargeError(config.maxUploadBytes);
     }
 
-    return { frameCount: 0 };
+    const { frameCount } = countFrames(Buffer.concat(chunks));
+    return { frameCount };
   });
 }
