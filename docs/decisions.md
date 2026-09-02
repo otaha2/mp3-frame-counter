@@ -21,6 +21,7 @@ never reused, so entries elsewhere can refer to them.
 - [D19 — Routing failures carry a `code` too](#d19--routing-failures-carry-a-code-too)
 - [D20 — One file per request](#d20--one-file-per-request)
 - [D21 — The upload size limit is 512 MiB](#d21--the-upload-size-limit-is-512-mib)
+- [D22 — The walkthrough's examples are tested, not asserted](#d22--the-walkthroughs-examples-are-tested-not-asserted)
 
 Also here: four [smaller choices](#smaller-choices) — the TypeScript version,
 CommonJS, the `dev` script and configuration — and two entries that have been
@@ -300,6 +301,50 @@ about connection time than file length should lower it — on a 10 Mbit/s link
 
 **Evidence.** `src/config.ts`; the limit is exercised on both upload paths in
 `test/http/fileUpload.test.ts`.
+
+## D22 — The walkthrough's examples are tested, not asserted
+
+**Question.** `docs/play/frame-walker.html` teaches by handing the reader two
+MP3 files and asking them to count the frames. Its pages quote byte offsets,
+frame lengths, chunk boundaries and two final answers. How are those numbers
+kept true?
+
+**Options.** (a) Work them out by hand and check them once. (b) Generate the
+page from the parser at build time. (c) Keep the numbers in the page and add a
+test that rebuilds both files as real bytes and asserts the parser agrees.
+
+**Decision.** (c).
+
+**Why.** (a) is how the page was first written, and it was wrong. The counter
+withholds the last 128 bytes of a stream against an ID3v1 tag, so the bytes it
+can actually read always trail the bytes that have arrived — and every moment
+the page described was off by roughly one chunk. Nothing catches that but the
+parser itself. (b) would keep the page correct at the cost of a
+build step, and the page is deliberately one file that opens from disk with no
+tooling. (c) keeps that property and still fails loudly: the test reads the two
+file descriptions out of the page, builds them with the same helpers the unit
+tests use, and checks that the segments tile exactly, that every frame's length
+matches the formula, that both files count 5, and that the chunk sizes put the
+readable frontier where the prose says it is.
+
+The same test also pins a choice about the example itself. The streaming file
+is deliberately well formed — no damage, and `resyncedBytes` is 0 throughout.
+An earlier version corrupted 40 bytes mid-stream to force the counter out of
+sync, which taught the right rule from the wrong premise: it implied that
+uploads routinely arrive damaged and that scanning is a normal part of reading
+one. Neither is true, and this service is not asked to repair broken files. A
+stream is already unproven at byte 0, so the same lesson lands at the opening
+of a clean file, and scanning is left as an offered move that is never the
+right one.
+
+The page is worth this because it is step 4 of the reading order the rest of the
+knowledge log assumes, and a walkthrough that teaches the wrong offsets is worse than no
+walkthrough. It also fixes the direction of trust: the parser is the authority
+and the page follows it, which is the same rule
+`test/fixtures/expected-counts.json` already applies to the counter.
+
+**Evidence.** `test/docs/frameWalker.test.ts`, and
+[the walkthrough itself](play/frame-walker.html)
 
 ## Smaller choices
 

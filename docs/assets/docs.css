@@ -183,3 +183,19 @@ details details[open] {
     overflow-x: auto;
   }
 }
+
+/* A single highlighted entry in the table of contents. */
+.callout {
+  border: 1px solid var(--accent);
+  border-left-width: 4px;
+  border-radius: 6px;
+  background: var(--code-bg);
+  padding: 0.4rem 1.1rem 1.1rem;
+  margin: 1.5rem 0;
+}
+.callout h2 {
+  margin-top: 0.7rem;
+}
+.callout p:last-child {
+  margin-bottom: 0;
+}

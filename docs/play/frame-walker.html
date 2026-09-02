@@ -1,0 +1,2362 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Frame Walker</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Chivo:wght@700;800&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap"
+    />
+    <style>
+      :root {
+        --ground: #e7eaed;
+        --surface: #ffffff;
+        --sunken: #f4f6f7;
+        --ink: #15181c;
+        --muted: #5b6673;
+        --rule: #ccd3da;
+        --rule-soft: #e3e8ec;
+
+        --accent: #5b3ee8;
+        --accent-soft: #ece8fd;
+
+        --audio: #0f6b70;
+        --audio-fill: #b9e2e2;
+        --meta: #8a5606;
+        --meta-fill: #f2ddb4;
+        --tag: #4e5964;
+        --tag-fill: #c6ced6;
+
+        --ok: #14613d;
+        --ok-fill: #d6ecdf;
+        --bad: #9c352c;
+        --bad-fill: #f7e0dd;
+
+        --display: 'Chivo', 'Helvetica Neue', Arial, sans-serif;
+        --body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+        --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme='light']) {
+          --ground: #0c0f13;
+          --surface: #171b21;
+          --sunken: #1d232b;
+          --ink: #e6eaee;
+          --muted: #98a3af;
+          --rule: #333c46;
+          --rule-soft: #262e37;
+
+          --accent: #9b86ff;
+          --accent-soft: #262040;
+
+          --audio: #6ad3d6;
+          --audio-fill: #16403f;
+          --meta: #e0b061;
+          --meta-fill: #3d2f12;
+          --tag: #a4b0bc;
+          --tag-fill: #39434f;
+
+          --ok: #6ecf98;
+          --ok-fill: #143324;
+          --bad: #ef9086;
+          --bad-fill: #45261f;
+        }
+      }
+
+      :root[data-theme='dark'] {
+        --ground: #0c0f13;
+        --surface: #171b21;
+        --sunken: #1d232b;
+        --ink: #e6eaee;
+        --muted: #98a3af;
+        --rule: #333c46;
+        --rule-soft: #262e37;
+
+        --accent: #9b86ff;
+        --accent-soft: #262040;
+
+        --audio: #6ad3d6;
+        --audio-fill: #16403f;
+        --meta: #e0b061;
+        --meta-fill: #3d2f12;
+        --tag: #a4b0bc;
+        --tag-fill: #39434f;
+
+        --ok: #6ecf98;
+        --ok-fill: #143324;
+        --bad: #ef9086;
+        --bad-fill: #45261f;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        background: var(--ground);
+        color: var(--ink);
+        font-family: var(--body);
+        font-size: 15px;
+        line-height: 1.55;
+        -webkit-font-smoothing: antialiased;
+      }
+
+      button {
+        font: inherit;
+        color: inherit;
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        * {
+          transition: none !important;
+          animation: none !important;
+        }
+      }
+
+      .shell {
+        max-width: 60rem;
+        margin: 0 auto;
+        padding: 1.5rem 1.1rem 4rem;
+        display: flex;
+        flex-direction: column;
+        gap: 1.1rem;
+      }
+
+      /* ---------------- transport ---------------- */
+
+      .transport {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.8rem 1.6rem;
+        padding: 0.8rem 1.1rem;
+      }
+
+      .brand {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: 1.1rem;
+        letter-spacing: -0.02em;
+        margin-right: auto;
+        display: flex;
+        align-items: baseline;
+        gap: 0.6rem;
+      }
+
+      .brand small {
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        font-weight: 500;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .transport.bare .readout {
+        display: none;
+      }
+
+      .readout {
+        display: flex;
+        flex-direction: column;
+        gap: 0.1rem;
+      }
+
+      .readout-label {
+        font-family: var(--mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      .readout-value {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 1.1rem;
+        font-variant-numeric: tabular-nums;
+        line-height: 1.1;
+      }
+
+      .readout-value.lit {
+        color: var(--accent);
+      }
+
+      /* ---------------- panels ---------------- */
+
+      .panel {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 4px;
+        padding: 1.1rem 1.2rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.95rem;
+      }
+
+      .eyebrow {
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      h1 {
+        font-family: var(--display);
+        font-weight: 800;
+        font-size: clamp(1.9rem, 5vw, 2.5rem);
+        letter-spacing: -0.03em;
+        line-height: 1.05;
+        text-wrap: balance;
+        margin: 0.3rem 0 0;
+      }
+
+      h2 {
+        font-family: var(--display);
+        font-weight: 700;
+        font-size: 1.15rem;
+        letter-spacing: -0.015em;
+        margin: 0;
+        text-wrap: balance;
+      }
+
+      h3 {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 0.7rem;
+        letter-spacing: 0.11em;
+        text-transform: uppercase;
+        color: var(--muted);
+        margin: 0;
+      }
+
+      p {
+        margin: 0;
+      }
+
+      .lede,
+      .ask-q {
+        max-width: 50rem;
+      }
+
+      .lede {
+        color: var(--muted);
+      }
+
+      code {
+        font-family: var(--mono);
+        font-size: 0.87em;
+        background: var(--sunken);
+        border-radius: 3px;
+        padding: 0.08em 0.34em;
+      }
+
+      a {
+        color: var(--accent);
+      }
+
+      details {
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 0.5rem 0.75rem;
+        background: var(--sunken);
+      }
+
+      summary {
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 0.72rem;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+
+      details[open] summary {
+        margin-bottom: 0.6rem;
+      }
+
+      .rate-table {
+        font-family: var(--mono);
+        font-size: 0.8rem;
+        line-height: 1.9;
+        overflow-x: auto;
+      }
+
+      .rate-table b {
+        color: var(--accent);
+      }
+
+      .bits {
+        font-family: var(--mono);
+        font-size: 0.82rem;
+        line-height: 1.8;
+        white-space: pre;
+        overflow-x: auto;
+        margin: 0;
+      }
+
+      /* ---------------- strip ---------------- */
+
+      .film {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+
+      .strip-outer {
+        position: relative;
+        padding-top: 9px;
+      }
+
+      .strip {
+        position: relative;
+        display: flex;
+        height: 52px;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        background: var(--sunken);
+        overflow: hidden;
+      }
+
+      .seg {
+        position: relative;
+        border: 0;
+        border-right: 1px solid var(--rule);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 12px;
+        padding: 0;
+        background: transparent;
+        cursor: default;
+      }
+
+      .seg:last-child {
+        border-right: 0;
+      }
+
+      .seg.unknown {
+        background: repeating-linear-gradient(-45deg, transparent 0 5px, var(--rule-soft) 5px 10px);
+      }
+
+      .seg.known {
+        cursor: pointer;
+        border-right-width: 2px;
+      }
+
+      .seg.known:hover {
+        filter: brightness(0.94);
+      }
+
+      .seg-tag,
+      .seg-id3v1 {
+        background: var(--tag-fill);
+        border-right-color: var(--tag);
+      }
+      .seg-meta {
+        background: var(--meta-fill);
+        border-right-color: var(--meta);
+      }
+      .seg-audio {
+        background: var(--audio-fill);
+        border-right-color: var(--audio);
+      }
+
+      .seg-mark {
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        font-weight: 600;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+      .seg-tag .seg-mark,
+      .seg-id3v1 .seg-mark {
+        color: var(--tag);
+      }
+      .seg-meta .seg-mark {
+        color: var(--meta);
+      }
+      .seg-audio .seg-mark {
+        color: var(--audio);
+      }
+
+      .seg.selected {
+        box-shadow: inset 0 0 0 2px var(--accent);
+      }
+
+      /* Bytes that have not arrived, and bytes held back unread. */
+      .veil,
+      .held {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        transition:
+          width 0.35s ease,
+          left 0.35s ease;
+        pointer-events: none;
+      }
+
+      .veil {
+        right: 0;
+        background: var(--ground);
+        border-left: 2px solid var(--accent);
+      }
+
+      .held {
+        background: repeating-linear-gradient(90deg, var(--rule) 0 2px, transparent 2px 5px);
+        border-left: 1px dashed var(--muted);
+      }
+
+      .cursor {
+        position: absolute;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: var(--accent);
+        transition: left 0.3s ease;
+        pointer-events: none;
+      }
+
+      .cursor::before {
+        content: '';
+        position: absolute;
+        top: -9px;
+        left: -4px;
+        border-left: 5px solid transparent;
+        border-right: 5px solid transparent;
+        border-top: 6px solid var(--accent);
+      }
+
+      .ruler {
+        display: flex;
+        justify-content: space-between;
+        font-family: var(--mono);
+        font-size: 0.66rem;
+        color: var(--muted);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.3rem 0.95rem;
+        font-size: 0.76rem;
+        color: var(--muted);
+      }
+
+      .legend span {
+        display: flex;
+        align-items: center;
+        gap: 0.35rem;
+      }
+
+      .chip-swatch {
+        width: 0.7rem;
+        height: 0.7rem;
+        border-radius: 2px;
+        border: 1px solid var(--rule);
+        flex: none;
+      }
+
+      /* ---------------- header fields ---------------- */
+
+      .fields {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(7rem, 1fr));
+        background: var(--sunken);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .field {
+        padding: 0.55rem 0.7rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.12rem;
+        box-shadow: inset -1px -1px 0 var(--rule);
+      }
+
+      .field-name {
+        font-family: var(--mono);
+        font-size: 0.6rem;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--muted);
+      }
+
+      .field-value {
+        font-family: var(--mono);
+        font-weight: 600;
+        font-size: 0.95rem;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .field-note {
+        font-size: 0.71rem;
+        color: var(--muted);
+      }
+
+      .inspector .field {
+        background: var(--accent-soft);
+      }
+
+      .inspector {
+        border-left: 3px solid var(--accent);
+      }
+
+      .inspector-head {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 1rem;
+      }
+
+      .close {
+        background: none;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        color: var(--muted);
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 0.7rem;
+        padding: 0.1rem 0.45rem;
+      }
+
+      /* ---------------- questions ---------------- */
+
+      .ask {
+        display: flex;
+        flex-direction: column;
+        gap: 0.8rem;
+      }
+
+      .options {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.5rem;
+      }
+
+      .opt {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 0.5rem 0.9rem;
+        cursor: pointer;
+        font-family: var(--mono);
+        font-size: 0.88rem;
+        font-variant-numeric: tabular-nums;
+        text-align: left;
+        transition:
+          border-color 0.12s ease,
+          opacity 0.12s ease;
+      }
+
+      .opt.wide {
+        font-family: var(--body);
+        font-size: 0.9rem;
+      }
+
+      .opt:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+
+      .opt:disabled {
+        cursor: default;
+      }
+
+      .opt:disabled:not(.right):not(.wrong) {
+        opacity: 0.4;
+        border-color: var(--rule-soft);
+      }
+
+      .opt.right {
+        border-color: var(--ok);
+        background: var(--ok-fill);
+        color: var(--ok);
+        font-weight: 600;
+      }
+
+      .opt.wrong {
+        border-color: var(--bad);
+        background: var(--bad-fill);
+        color: var(--bad);
+        text-decoration: line-through;
+      }
+
+      .formula {
+        background: var(--sunken);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 0.8rem 0.9rem;
+        font-family: var(--mono);
+        font-size: 0.92rem;
+        display: flex;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 0.3rem;
+        line-height: 2.1;
+      }
+
+      .blank {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 4.2rem;
+        padding: 0.12rem 0.5rem;
+        border: 1px dashed var(--muted);
+        border-radius: 3px;
+        color: var(--muted);
+        background: var(--surface);
+      }
+
+      .blank.filled {
+        border-style: solid;
+        border-color: var(--ok);
+        background: var(--ok-fill);
+        color: var(--ok);
+        font-weight: 600;
+      }
+
+      .blank.active {
+        border-color: var(--accent);
+        border-style: solid;
+        color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      .feedback {
+        border-left: 3px solid var(--rule);
+        padding: 0.1rem 0 0.1rem 0.8rem;
+        font-size: 0.92rem;
+        color: var(--muted);
+        max-width: 50rem;
+      }
+
+      .feedback.good {
+        border-color: var(--ok);
+      }
+      .feedback.bad {
+        border-color: var(--bad);
+      }
+      .feedback strong {
+        color: var(--ink);
+      }
+
+      /* ---------------- matching ---------------- */
+
+      .match-wrap {
+        position: relative;
+      }
+
+      .match-lines {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        overflow: visible;
+      }
+
+      .match-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.45rem 4rem;
+      }
+
+      @media (max-width: 34rem) {
+        .match-grid {
+          gap: 0.45rem 1.4rem;
+        }
+      }
+
+      .match-col {
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+      }
+
+      .mbox {
+        background: var(--surface);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        padding: 0.55rem 0.7rem;
+        cursor: pointer;
+        text-align: left;
+        font-size: 0.88rem;
+        transition:
+          border-color 0.12s ease,
+          background 0.12s ease;
+      }
+
+      .mbox:hover:not(:disabled) {
+        border-color: var(--accent);
+      }
+
+      .mbox.picked {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+      }
+
+      .mbox.linked {
+        border-color: var(--audio);
+        background: var(--audio-fill);
+        color: var(--audio);
+        cursor: default;
+        font-weight: 500;
+      }
+
+      .mbox.shake {
+        animation: nudge 0.3s ease;
+        border-color: var(--bad);
+      }
+
+      @keyframes nudge {
+        0%,
+        100% {
+          transform: translateX(0);
+        }
+        25% {
+          transform: translateX(-4px);
+        }
+        75% {
+          transform: translateX(4px);
+        }
+      }
+
+      .mbox .mono {
+        font-family: var(--mono);
+        font-size: 0.83rem;
+      }
+
+      /* ---------------- buttons ---------------- */
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.55rem;
+        align-items: center;
+      }
+
+      .btn {
+        background: var(--ink);
+        color: var(--surface);
+        border: 1px solid var(--ink);
+        border-radius: 3px;
+        padding: 0.5rem 1.05rem;
+        cursor: pointer;
+        font-weight: 500;
+        font-size: 0.9rem;
+      }
+
+      .btn:hover {
+        opacity: 0.85;
+      }
+
+      .btn.ghost {
+        background: transparent;
+        color: var(--ink);
+        border-color: var(--rule);
+      }
+
+      .btn.chunk {
+        background: var(--accent);
+        border-color: var(--accent);
+        color: #fff;
+        font-family: var(--mono);
+        font-size: 0.83rem;
+      }
+
+      /* ---------------- rail ---------------- */
+
+      .rail {
+        display: flex;
+        gap: 1px;
+        background: var(--rule);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .rail-step {
+        flex: 1;
+        background: var(--surface);
+        padding: 0.45rem 0.6rem;
+        font-family: var(--mono);
+        font-size: 0.64rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--muted);
+        text-align: center;
+        white-space: nowrap;
+        overflow: hidden;
+      }
+
+      .rail-step.on {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 600;
+      }
+
+      .rail-step.done {
+        color: var(--ok);
+      }
+
+      .rail-step .short {
+        display: none;
+      }
+
+      @media (max-width: 46rem) {
+        .rail-step .full {
+          display: none;
+        }
+        .rail-step .short {
+          display: inline;
+        }
+      }
+
+      /* ---------------- result ---------------- */
+
+      .scorecard {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+        background: var(--sunken);
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+
+      .score {
+        padding: 0.9rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.2rem;
+        box-shadow: inset -1px 0 0 var(--rule);
+      }
+
+      .score b {
+        font-family: var(--mono);
+        font-size: 1.6rem;
+        font-weight: 600;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .takeaways {
+        display: grid;
+        grid-template-columns: max-content 1fr;
+        gap: 0.6rem 0.75rem;
+        align-items: start;
+      }
+
+      .takeaway {
+        display: contents;
+      }
+
+      .takeaway .k {
+        font-family: var(--mono);
+        font-size: 0.63rem;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 2px;
+        padding: 0.2rem 0.45rem;
+        white-space: nowrap;
+        margin-top: 0.15rem;
+      }
+
+      .takeaway .v {
+        font-size: 0.93rem;
+      }
+
+      @media (max-width: 34rem) {
+        .takeaways {
+          grid-template-columns: 1fr;
+          gap: 0.2rem;
+        }
+        .takeaway .k {
+          justify-self: start;
+          margin-top: 0.5rem;
+        }
+      }
+
+      .number-entry {
+        display: flex;
+        gap: 0.55rem;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .number-entry input {
+        font-family: var(--mono);
+        font-size: 1.1rem;
+        font-weight: 600;
+        width: 6rem;
+        padding: 0.42rem 0.7rem;
+        border: 1px solid var(--rule);
+        border-radius: 3px;
+        background: var(--surface);
+        color: var(--ink);
+        text-align: center;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <div class="transport bare" id="transport">
+        <div class="brand">Frame Walker <small id="actName">start</small></div>
+        <div class="readout">
+          <span class="readout-label">Offset</span>
+          <span class="readout-value" id="rOffset">—</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">On disk</span>
+          <span class="readout-value" id="rPhysical">0</span>
+        </div>
+        <div class="readout">
+          <span class="readout-label">Audio frames</span>
+          <span class="readout-value lit" id="rCount">0</span>
+        </div>
+        <div class="readout" id="arrivedBox">
+          <span class="readout-label">Arrived</span>
+          <span class="readout-value" id="rArrived">—</span>
+        </div>
+        <div class="readout" id="readableBox">
+          <span class="readout-label">Readable</span>
+          <span class="readout-value" id="rReadable">—</span>
+        </div>
+      </div>
+
+      <div class="rail" id="rail"></div>
+      <div id="stage"></div>
+    </div>
+
+    <script>
+      'use strict';
+
+      /* ------------------------------------------------------------------ data
+       * Every length below is floor(144 * bitrate / sampleRate) + padding, and
+       * both files have been fed to the project's own counter, which returns
+       * the answers this game asks for.
+       */
+
+      const BITRATES = [32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320];
+      const RATES = [44100, 48000, 32000];
+
+      /** Bytes of a stream never read until it ends: they may be an ID3v1 tag. */
+      const WITHHELD = 128;
+
+      const FILE_WALK = {
+        total: 2455,
+        segments: [
+          { kind: 'tag', start: 0, len: 32, name: 'ID3v2 tag', mark: 'ID3v2' },
+          {
+            kind: 'meta',
+            start: 32,
+            len: 208,
+            name: 'Xing frame',
+            mark: 'Xing',
+            hdr: [64, 44100, 0],
+          },
+          { kind: 'audio', start: 240, len: 417, name: 'Frame 1', mark: '1', hdr: [128, 44100, 0] },
+          { kind: 'audio', start: 657, len: 418, name: 'Frame 2', mark: '2', hdr: [128, 44100, 1] },
+          {
+            kind: 'audio',
+            start: 1075,
+            len: 522,
+            name: 'Frame 3',
+            mark: '3',
+            hdr: [160, 44100, 0],
+          },
+          { kind: 'audio', start: 1597, len: 313, name: 'Frame 4', mark: '4', hdr: [96, 44100, 0] },
+          {
+            kind: 'audio',
+            start: 1910,
+            len: 417,
+            name: 'Frame 5',
+            mark: '5',
+            hdr: [128, 44100, 0],
+          },
+          { kind: 'id3v1', start: 2327, len: 128, name: 'ID3v1 tag', mark: 'ID3v1' },
+        ],
+      };
+
+      /* Chunk sizes chosen so the readable frontier lands on 300, 418, 800,
+       * 1250 and 1750 — the moments where each decision below actually falls. */
+      const FILE_STREAM = {
+        total: 1878,
+        chunks: [428, 118, 382, 450, 500],
+        segments: [
+          { kind: 'audio', start: 0, len: 417, name: 'Frame 1', mark: '1', hdr: [128, 44100, 0] },
+          { kind: 'audio', start: 417, len: 365, name: 'Frame 2', mark: '2', hdr: [112, 44100, 0] },
+          { kind: 'audio', start: 782, len: 417, name: 'Frame 3', mark: '3', hdr: [128, 44100, 0] },
+          { kind: 'audio', start: 1199, len: 261, name: 'Frame 4', mark: '4', hdr: [80, 44100, 0] },
+          {
+            kind: 'audio',
+            start: 1460,
+            len: 418,
+            name: 'Frame 5',
+            mark: '5',
+            hdr: [128, 44100, 1],
+          },
+        ],
+      };
+
+      /* ----------------------------------------------------------------- state */
+
+      const S = {
+        act: 0,
+        step: 0,
+        counted: 0,
+        physical: 0,
+        cursor: 0,
+        frontier: 0,
+        chunkIndex: 0,
+        revealed: new Set(),
+        selected: null,
+        asked: 0,
+        clean: 0,
+        file: null,
+        missed: false,
+        askedKey: null,
+        resolvedKey: null,
+        solved: null,
+        blanks: null,
+        activeBlank: 0,
+        links: {},
+        rightOrder: null,
+        pick: null,
+        matchMiss: null,
+        done: false,
+        answered: false,
+      };
+
+      const ACTS = [
+        ['Read a header', '1'],
+        ['Walk a file', '2'],
+        ['Count as it streams', '3'],
+        ['Result', '✓'],
+      ];
+
+      /* --------------------------------------------------------------- helpers */
+
+      const el = (tag, cls, html) => {
+        const n = document.createElement(tag);
+        if (cls) n.className = cls;
+        if (html !== undefined) n.innerHTML = html;
+        return n;
+      };
+
+      const stage = document.getElementById('stage');
+      const frameLen = (kbps, hz, pad) => Math.floor((144 * kbps * 1000) / hz) + pad;
+      const readable = () => Math.max(0, S.frontier - WITHHELD);
+
+      /** True on the screen that asks for the final count, where a live tally would answer it. */
+      function hidingTheAnswer() {
+        if (S.act === 2) return WALK[S.step] && WALK[S.step].kind === 'final';
+        if (S.act === 3) return S.done;
+        return false;
+      }
+
+      function setReadouts() {
+        const walking = S.act === 2 || S.act === 3;
+        document.getElementById('transport').classList.toggle('bare', S.act === 0);
+        document.getElementById('actName').textContent = S.act === 0 ? 'start' : ACTS[S.act - 1][0];
+        document.getElementById('rOffset').textContent = walking ? S.cursor : '—';
+        document.getElementById('rPhysical').textContent =
+          walking || S.act === 4 ? S.physical : '0';
+        document.getElementById('rCount').textContent = hidingTheAnswer()
+          ? '?'
+          : walking || S.act === 4
+            ? S.counted
+            : '0';
+        document.getElementById('arrivedBox').style.display = S.act === 3 ? '' : 'none';
+        document.getElementById('readableBox').style.display = S.act === 3 ? '' : 'none';
+        if (S.act === 3) {
+          document.getElementById('rArrived').textContent = S.frontier;
+          document.getElementById('rReadable').textContent = S.done ? S.frontier : readable();
+        }
+      }
+
+      function renderRail() {
+        const rail = document.getElementById('rail');
+        rail.innerHTML = '';
+        ACTS.forEach(([name, short], i) => {
+          const d = el(
+            'div',
+            'rail-step',
+            '<span class="full">' + name + '</span><span class="short">' + short + '</span>',
+          );
+          if (S.act === i + 1) d.classList.add('on');
+          else if (S.act > i + 1) d.classList.add('done');
+          rail.appendChild(d);
+        });
+        rail.classList.toggle('hidden', S.act === 0);
+        rail.style.display = S.act === 0 ? 'none' : '';
+      }
+
+      /** Counts a question once, however many times its screen re-renders. */
+      function ask(key) {
+        if (S.askedKey === key) return;
+        S.askedKey = key;
+        S.asked += 1;
+        S.missed = false;
+      }
+
+      /** Credits a question once, however many times its screen re-renders. */
+      function resolve(key) {
+        if (S.resolvedKey === key) return;
+        S.resolvedKey = key;
+        if (!S.missed) S.clean += 1;
+        S.missed = false;
+      }
+
+      /* ----------------------------------------------------------------- strip */
+
+      function buildStrip(streaming) {
+        const film = el('div', 'film');
+        const outer = el('div', 'strip-outer');
+        const strip = el('div', 'strip');
+
+        S.file.segments.forEach((seg, i) => {
+          const known = S.revealed.has(i);
+          const b = el('button', 'seg ' + (known ? 'known seg-' + seg.kind : 'unknown'));
+          b.style.flex = seg.len + ' 0 0';
+          b.type = 'button';
+          if (known) {
+            b.title = seg.name + ' — ' + seg.len + ' bytes at offset ' + seg.start;
+            b.setAttribute('aria-label', b.title);
+            if (seg.len / S.file.total > 0.02) b.appendChild(el('span', 'seg-mark', seg.mark));
+            if (S.selected === i) b.classList.add('selected');
+            b.addEventListener('click', () => {
+              S.selected = S.selected === i ? null : i;
+              render();
+            });
+          } else {
+            b.disabled = true;
+            b.setAttribute('aria-label', 'bytes not yet identified');
+          }
+          strip.appendChild(b);
+        });
+
+        if (streaming && !S.done) {
+          const pct = (n) => (n / S.file.total) * 100 + '%';
+          const held = el('div', 'held');
+          held.style.left = pct(readable());
+          held.style.width = pct(Math.min(WITHHELD, S.frontier - readable()));
+          strip.appendChild(held);
+
+          const veil = el('div', 'veil');
+          veil.style.width = pct(S.file.total - S.frontier);
+          strip.appendChild(veil);
+        }
+
+        const cur = el('div', 'cursor');
+        cur.style.left = 'calc(' + (S.cursor / S.file.total) * 100 + '% - 1px)';
+        strip.appendChild(cur);
+
+        outer.appendChild(strip);
+        film.appendChild(outer);
+
+        const ruler = el('div', 'ruler');
+        ruler.appendChild(el('span', '', 'byte 0'));
+        ruler.appendChild(el('span', '', 'byte ' + S.file.total));
+        film.appendChild(ruler);
+
+        const kinds = [...new Set(S.file.segments.map((s) => s.kind))];
+        const LABELS = {
+          tag: 'tag — not audio',
+          id3v1: 'tag — not audio',
+          meta: 'metadata frame',
+          audio: 'audio frame',
+        };
+        const legend = el('div', 'legend');
+        const seen = new Set();
+        kinds.forEach((k) => {
+          if (seen.has(LABELS[k])) return;
+          seen.add(LABELS[k]);
+          const s = el('span');
+          const sw = el('i', 'chip-swatch');
+          sw.style.background = 'var(--' + (k === 'id3v1' ? 'tag' : k) + '-fill)';
+          sw.style.borderColor = 'var(--' + (k === 'id3v1' ? 'tag' : k) + ')';
+          s.appendChild(sw);
+          s.appendChild(el('span', '', LABELS[k]));
+          legend.appendChild(s);
+        });
+        const unk = el('span');
+        const usw = el('i', 'chip-swatch');
+        usw.style.background =
+          'repeating-linear-gradient(-45deg, transparent 0 2px, var(--rule-soft) 2px 4px)';
+        unk.appendChild(usw);
+        unk.appendChild(el('span', '', 'not identified yet'));
+        legend.appendChild(unk);
+        if (streaming && !S.done) {
+          const h = el('span');
+          const hsw = el('i', 'chip-swatch');
+          hsw.style.background =
+            'repeating-linear-gradient(90deg, var(--rule) 0 2px, transparent 2px 5px)';
+          h.appendChild(hsw);
+          h.appendChild(el('span', '', 'held back, unread'));
+          legend.appendChild(h);
+        }
+        film.appendChild(legend);
+
+        if (S.selected !== null && S.revealed.has(S.selected)) {
+          film.appendChild(inspector(S.file.segments[S.selected]));
+        }
+        return film;
+      }
+
+      function inspector(seg) {
+        const box = el('div', 'panel inspector');
+        box.style.padding = '0.85rem 1rem';
+        const head = el('div', 'inspector-head');
+        head.appendChild(
+          el('h3', '', seg.name + ' · offset ' + seg.start + ' · ' + seg.len + ' bytes'),
+        );
+        const x = el('button', 'close', 'close');
+        x.type = 'button';
+        x.addEventListener('click', () => {
+          S.selected = null;
+          render();
+        });
+        head.appendChild(x);
+        box.appendChild(head);
+        if (seg.hdr)
+          box.appendChild(fieldGrid(seg.hdr[0], seg.hdr[1], seg.hdr[2], seg.kind === 'meta'));
+        else
+          box.appendChild(
+            el('p', 'lede', 'A tag. Text, not audio, skipped by its declared length.'),
+          );
+        return box;
+      }
+
+      /** The header as decoded numbers. `hideNotes` makes the player use the table. */
+      function fieldGrid(kbps, hz, pad, isMeta, hideNotes) {
+        const g = el('div', 'fields');
+        const add = (name, value, note) => {
+          const f = el('div', 'field');
+          f.appendChild(el('span', 'field-name', name));
+          f.appendChild(el('span', 'field-value', value));
+          if (note && !hideNotes) f.appendChild(el('span', 'field-note', note));
+          g.appendChild(f);
+        };
+        add('Sync word', '11 bits', 'all set');
+        add('Version', '3', 'means MPEG-1');
+        add('Layer', '1', 'means Layer III');
+        add('Bitrate index', String(BITRATES.indexOf(kbps) + 1), kbps + ' kbps');
+        add('Rate index', String(RATES.indexOf(hz)), hz + ' Hz');
+        add('Padding', String(pad), pad ? 'one extra byte' : 'no extra byte');
+        if (isMeta) add('Payload', 'Xing', 'a table, not sound');
+        return g;
+      }
+
+      function rateTables() {
+        const d = el('details');
+        d.appendChild(el('summary', '', 'The tables these indexes point into'));
+        const t = el('div', 'rate-table');
+        t.innerHTML =
+          'bitrate index → kbps<br>' +
+          BITRATES.map((b, i) => i + 1 + '→' + b).join('&nbsp; ') +
+          '<br><br>rate index → Hz<br>' +
+          RATES.map((r, i) => i + '→' + r).join('&nbsp; ') +
+          '<br><br>Index <b>0</b> means free format, where the header declares no bitrate at all, ' +
+          'and <b>15</b> is reserved. Either one makes the parser call these four bytes ' +
+          '&ldquo;not a header&rdquo; and step on.';
+        d.appendChild(t);
+        return d;
+      }
+
+      /* ----------------------------------------------------------------- act 1 */
+
+      const PAIRS = [
+        [
+          'Sync word',
+          '11 bits, all set',
+          'The only marker a frame gets. Nothing else announces one.',
+        ],
+        [
+          'Version',
+          '3 → MPEG-1',
+          'Versions 2 and 2.5 are real MP3s at lower sample rates. This service counts version 3 only.',
+        ],
+        [
+          'Layer',
+          '1 → Layer III',
+          'The 3 in MP3. Note the two are reversed: version 3 means MPEG-1, layer 1 means Layer III.',
+        ],
+        ['Bitrate index', '5 → 64 kbps', 'A row number in a table, not the bitrate itself.'],
+        [
+          'Rate index',
+          '0 → 44100 Hz',
+          '44100 is the common one. Each rate gives a different frame length for the same bitrate.',
+        ],
+        ['Padding', '0 → no extra byte', 'When set, adds one byte to this frame and no other.'],
+      ];
+
+      function renderMatch() {
+        stage.innerHTML = '';
+        const p = el('div', 'panel');
+        p.appendChild(el('p', 'eyebrow', 'Act 1 of 3'));
+        p.appendChild(el('h2', '', 'Every frame opens with four bytes. Six numbers live in them.'));
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            'These are decoded numbers, not raw bytes. Pick a field on the left, then its match on the right.',
+          ),
+        );
+
+        const wrap = el('div', 'match-wrap');
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.setAttribute('class', 'match-lines');
+        wrap.appendChild(svg);
+
+        const grid = el('div', 'match-grid');
+        const left = el('div', 'match-col');
+        const right = el('div', 'match-col');
+
+        if (!S.rightOrder) {
+          S.rightOrder = PAIRS.map((_, i) => i);
+          for (let i = S.rightOrder.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [S.rightOrder[i], S.rightOrder[j]] = [S.rightOrder[j], S.rightOrder[i]];
+          }
+        }
+
+        PAIRS.forEach((pair, i) => {
+          const b = el('button', 'mbox', '<span class="mono">' + pair[0] + '</span>');
+          b.type = 'button';
+          b.dataset.side = 'L';
+          b.dataset.idx = String(i);
+          if (S.links[i] !== undefined) b.classList.add('linked');
+          else if (S.pick === i) b.classList.add('picked');
+          b.addEventListener('click', () => onPick('L', i, b));
+          left.appendChild(b);
+        });
+
+        S.rightOrder.forEach((idx) => {
+          const b = el('button', 'mbox', '<span class="mono">' + PAIRS[idx][1] + '</span>');
+          b.type = 'button';
+          b.dataset.side = 'R';
+          b.dataset.idx = String(idx);
+          if (S.links[idx] !== undefined) b.classList.add('linked');
+          b.addEventListener('click', () => onPick('R', idx, b));
+          right.appendChild(b);
+        });
+
+        grid.appendChild(left);
+        grid.appendChild(right);
+        wrap.appendChild(grid);
+        p.appendChild(wrap);
+
+        if (S.matchMiss !== null) {
+          const fb = el('div', 'feedback bad');
+          fb.innerHTML =
+            '<strong>No.</strong> ' +
+            PAIRS[S.matchMiss][1] +
+            ' belongs to <strong>' +
+            PAIRS[S.matchMiss][0] +
+            '</strong>.';
+          p.appendChild(fb);
+        }
+
+        const done = Object.keys(S.links).length;
+        if (done > 0) {
+          const list = el('div', 'takeaways');
+          Object.keys(S.links)
+            .map(Number)
+            .sort((a, b) => a - b)
+            .forEach((i) => {
+              const t = el('div', 'takeaway');
+              t.appendChild(el('span', 'k', PAIRS[i][0]));
+              t.appendChild(el('span', 'v', PAIRS[i][2]));
+              list.appendChild(t);
+            });
+          p.appendChild(list);
+        }
+
+        p.appendChild(rateTables());
+
+        if (done === PAIRS.length) {
+          const act = el('div', 'actions');
+          const btn = el('button', 'btn', 'Walk a file →');
+          btn.type = 'button';
+          btn.addEventListener('click', startWalk);
+          act.appendChild(btn);
+          p.appendChild(act);
+        }
+
+        stage.appendChild(p);
+        drawLines(svg, wrap);
+        requestAnimationFrame(() => drawLines(svg, wrap));
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(() => {
+            if (S.act === 1) drawLines(svg, wrap);
+          });
+        }
+      }
+
+      function onPick(side, idx, node) {
+        if (S.links[idx] !== undefined) return;
+        if (side === 'L') {
+          S.pick = S.pick === idx ? null : idx;
+          S.matchMiss = null;
+          render();
+          return;
+        }
+        if (S.pick === null) return;
+        const key = 'match:' + S.pick;
+        ask(key);
+        if (S.pick === idx) {
+          S.links[idx] = true;
+          S.pick = null;
+          S.matchMiss = null;
+          resolve(key);
+          render();
+        } else {
+          S.missed = true;
+          node.classList.add('shake');
+          setTimeout(() => {
+            S.matchMiss = idx;
+            S.pick = null;
+            render();
+          }, 320);
+        }
+      }
+
+      function drawLines(svg, wrap) {
+        const box = wrap.getBoundingClientRect();
+        if (!box.width) return;
+        svg.setAttribute('viewBox', '0 0 ' + box.width + ' ' + box.height);
+        svg.innerHTML = '';
+        wrap.querySelectorAll('.mbox[data-side="L"]').forEach((l) => {
+          const idx = l.dataset.idx;
+          if (S.links[idx] === undefined) return;
+          const r = wrap.querySelector('.mbox[data-side="R"][data-idx="' + idx + '"]');
+          if (!r) return;
+          const a = l.getBoundingClientRect();
+          const b = r.getBoundingClientRect();
+          const x1 = a.right - box.left;
+          const y1 = a.top + a.height / 2 - box.top;
+          const x2 = b.left - box.left;
+          const y2 = b.top + b.height / 2 - box.top;
+          const mid = (x1 + x2) / 2;
+          const line = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+          line.setAttribute(
+            'd',
+            'M' +
+              x1 +
+              ',' +
+              y1 +
+              ' C' +
+              mid +
+              ',' +
+              y1 +
+              ' ' +
+              mid +
+              ',' +
+              y2 +
+              ' ' +
+              x2 +
+              ',' +
+              y2,
+          );
+          line.setAttribute('fill', 'none');
+          line.setAttribute('stroke', 'var(--audio)');
+          line.setAttribute('stroke-width', '1.5');
+          svg.appendChild(line);
+        });
+      }
+
+      window.addEventListener('resize', () => {
+        if (S.act === 1) render();
+      });
+
+      /* ----------------------------------------------------------------- act 2 */
+
+      const WALK = [
+        {
+          kind: 'choice',
+          q: 'The file opens with an ID3v2 tag: a block of text holding the artist, title and album. No audio in it.',
+          sub: 'Its header is 10 bytes, and the size field inside that header counts the body only. The field reads 22. How many bytes do you skip?',
+          options: [
+            {
+              label: '10',
+              ok: false,
+              why: "That drops you 22 bytes into the tag's text. The first thing you would try to read as a header is somebody's album title.",
+            },
+            {
+              label: '32',
+              ok: true,
+              why: '10 + 22. The size is also stored seven bits per byte, so it can never contain 0xFF and be mistaken for a sync word. The body has no such protection, which is why the tag is skipped by length rather than scanned.',
+            },
+            {
+              label: '22',
+              ok: false,
+              why: 'That is the body alone. The 10 bytes carrying the field are not counted in it.',
+            },
+          ],
+          then: { reveal: [0], cursor: 32 },
+        },
+        {
+          kind: 'formula',
+          seg: 1,
+          q: 'A valid header sits at offset 32. Work out how long its frame is.',
+          then: { reveal: [1], cursor: 32, physical: 1 },
+        },
+        {
+          kind: 'choice',
+          q: 'That 208-byte frame carries a Xing table, not sound. The encoder writes it when it makes the file.',
+          sub: 'Does it belong in the frame count?',
+          options: [
+            {
+              label: 'No — it carries no audio',
+              ok: true,
+              why: 'Skipped like any frame, but not counted — and only because it is the <em>first</em> frame. The same marker appearing later is audio that happens to spell it. Watch the two readouts above diverge from here on.',
+            },
+            {
+              label: 'Yes — it is a real frame',
+              ok: false,
+              why: 'It is a real frame on disk, which is why the “on disk” readout counts it. The number this service reports is audio frames.',
+            },
+          ],
+          then: { cursor: 240 },
+        },
+        {
+          kind: 'jump',
+          seg: 2,
+          q: 'Offset 240, and a second header.',
+          options: [
+            {
+              label: '244',
+              ok: false,
+              why: 'That is 4 bytes on — the header only. The jump is the whole frame, header and audio together.',
+            },
+            {
+              label: '657',
+              ok: true,
+              why: '417 bytes. The counter does not search for the next header; it calculates where it must be and goes there.',
+            },
+            {
+              label: '448',
+              ok: false,
+              why: "208 bytes — the Xing frame's length. Every frame declares its own.",
+            },
+          ],
+          then: { reveal: [2], cursor: 657, count: 1, physical: 1 },
+        },
+        {
+          kind: 'jump',
+          seg: 3,
+          q: 'Offset 657. Watch the padding bit.',
+          options: [
+            {
+              label: '1074',
+              ok: false,
+              why: '417 bytes, the length with no padding. The padding bit adds one.',
+            },
+            {
+              label: '1075',
+              ok: true,
+              why: '418 bytes: 417 from the formula, plus 1 for padding.',
+            },
+            { label: '1493', ok: false, why: '836 — you added the frame twice.' },
+          ],
+          then: { reveal: [3], cursor: 1075, count: 1, physical: 1 },
+        },
+        {
+          kind: 'jump',
+          seg: 4,
+          q: 'Offset 1075. The bitrate has changed mid-file — encoders are allowed to do that, giving a quiet passage fewer bits than a loud one.',
+          options: [
+            {
+              label: '1597',
+              ok: true,
+              why: '522 bytes. A bitrate change costs nothing, because the length was never carried forward — it is read again every frame. The last two frames are more of the same, so they are walked for you: 313 bytes, then 417, landing on 2327.',
+            },
+            {
+              label: '1701',
+              ok: false,
+              why: '626 bytes is the length for 192 kbps. Index 10 is 160.',
+            },
+            {
+              label: '1492',
+              ok: false,
+              why: "417 bytes — frame 1's length. Reusing a length is exactly what this file punishes.",
+            },
+          ],
+          then: { reveal: [4, 5, 6], cursor: 2327, count: 3, physical: 3 },
+        },
+        {
+          kind: 'choice',
+          q: 'The head is at 2327. The last 128 bytes begin with the letters TAG and hold no valid header.',
+          sub: 'What are they?',
+          options: [
+            {
+              label: 'An ID3v1 tag',
+              ok: true,
+              why: 'Always 128 bytes, always last, always starting with TAG. The audio ended at 2327.',
+            },
+            {
+              label: 'A frame the file was cut off part-way through',
+              ok: false,
+              why: 'A cut-off frame would still start with a sync word. There is none here.',
+            },
+            {
+              label: 'Damaged bytes to scan past',
+              ok: false,
+              why: 'Scanning them would be harmless but pointless. They are a known structure with a known length.',
+            },
+          ],
+          then: { reveal: [7], cursor: 2455 },
+        },
+        {
+          kind: 'final',
+          q: 'You have reached the end of the file. The bar above says six frames are on disk.',
+          sub: 'How many <em>audio</em> frames does it hold — the number this service reports?',
+          answer: 5,
+          why: 'Six frames on disk, one of them the Xing table. Both numbers are true; only one answers the question.',
+        },
+      ];
+
+      function startWalk() {
+        S.act = 2;
+        S.step = 0;
+        S.file = FILE_WALK;
+        S.cursor = 0;
+        S.counted = 0;
+        S.physical = 0;
+        S.revealed = new Set();
+        S.selected = null;
+        S.blanks = null;
+        S.askedKey = null;
+        S.solved = null;
+        render();
+      }
+
+      /* ----------------------------------------------------------------- act 3 */
+
+      const STREAM = [
+        {
+          at: 0,
+          answer: 'wait',
+          q: 'A valid header sits at offset 0. Its frame runs to 417, and 300 bytes are readable.',
+          why: 'Most of that frame has not arrived. Nothing to decide yet.',
+        },
+        {
+          at: 0,
+          answer: 'wait',
+          q: '418 bytes are readable. The frame ending at 417 is complete — every byte of it is in hand.',
+          why: 'This is the one worth slowing down for. Completeness is not the problem; you have the whole frame. What you lack is proof. Nothing has confirmed this is a frame boundary rather than eleven set bits landing by chance, and the header that would confirm it sits at 417, four bytes you cannot read yet.',
+        },
+        {
+          at: 0,
+          seg: 0,
+          answer: 'count',
+          q: '800 bytes are readable, and a valid header sits at 417 — exactly one frame on.',
+          why: 'Two headers agreeing one frame apart. That is the proof, and from here the chain is trusted link by link.',
+          then: { count: 1, physical: 1, reveal: [0], cursor: 417 },
+        },
+        {
+          at: 417,
+          seg: 1,
+          answer: 'count',
+          q: 'In sync at 417. A 365-byte frame ending at 782, inside what you can read.',
+          why: 'In sync, a header is trusted on its own. No second opinion needed.',
+          then: { count: 1, physical: 1, reveal: [1], cursor: 782 },
+        },
+        {
+          at: 782,
+          answer: 'wait',
+          q: 'In sync at 782. This frame runs to 1199.',
+          why: 'Trusted, but not yet complete. Being in sync buys you proof, not bytes.',
+        },
+        {
+          at: 782,
+          seg: 2,
+          answer: 'count',
+          q: '1250 readable. The frame ending at 1199 is complete.',
+          why: 'Frame 3 counts.',
+          then: { count: 1, physical: 1, reveal: [2], cursor: 1199 },
+        },
+        {
+          at: 1199,
+          answer: 'wait',
+          q: 'In sync at 1199. A 261-byte frame ending at 1460.',
+          why: 'Past the frontier again. Same reason as before.',
+        },
+        {
+          at: 1199,
+          seg: 3,
+          answer: 'count',
+          q: '1750 readable. The frame ending at 1460 is complete.',
+          why: 'Frame 4 counts.',
+          then: { count: 1, physical: 1, reveal: [3], cursor: 1460 },
+        },
+        {
+          at: 1460,
+          seg: 4,
+          answer: 'wait',
+          q: 'The header at 1460 declares 418 bytes, ending at 1878 — and all 1878 bytes have arrived. But only 1750 are readable.',
+          why: 'The last 128 bytes of a stream are always held back, because they may turn out to be an ID3v1 tag and must never be read as audio. Only when the upload ends can the counter look at them. It does, they are not a tag, and frame 5 counts.',
+          then: { count: 1, physical: 1, reveal: [4], cursor: 1878, ends: true },
+        },
+      ];
+
+      const VERDICTS = [
+        ['count', 'Count this frame'],
+        ['wait', 'Wait for more bytes'],
+        ['scan', 'Not a frame — scan forward'],
+      ];
+
+      function startStream() {
+        S.act = 3;
+        S.step = -1;
+        S.file = FILE_STREAM;
+        S.cursor = 0;
+        S.counted = 0;
+        S.physical = 0;
+        S.frontier = FILE_STREAM.chunks[0];
+        S.chunkIndex = 0;
+        S.revealed = new Set();
+        S.selected = null;
+        S.askedKey = null;
+        S.solved = null;
+        S.done = false;
+        render();
+      }
+
+      function renderStreamIntro() {
+        stage.innerHTML = '';
+        const p = el('div', 'panel');
+        p.appendChild(el('p', 'eyebrow', 'Act 3 of 3'));
+        p.appendChild(el('h2', '', 'Same job. The bytes are still arriving.'));
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            'You never hold the file — only what has landed. Two numbers now sit in the bar above. <strong>Arrived</strong> is what the network has delivered. <strong>Readable</strong> is 128 less, because the last 128 bytes of a stream are always held back: they may turn out to be an ID3v1 tag, and a tag must never be read as audio.',
+          ),
+        );
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            'Two words share the root <em>sync</em>, and they mean different things. The <strong>sync word</strong> is the 11 set bits that open a header. Being <strong>in sync</strong> is your own state: the last frame ended exactly where this one begins, so you can trust this header on its own. Scan forward and you lose it — then one header proves nothing, and you need a second one a frame later to agree.',
+          ),
+        );
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            'At each stop you either count the frame or wait for more bytes. A third button offers to scan forward for a header. This file is well formed, so you will never need it — that button is for a file that is damaged or was never audio, and the walkthrough will tell you why each time you reach for it.',
+          ),
+        );
+        const a = el('div', 'actions');
+        const b = el('button', 'btn', 'First chunk →');
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          S.step = 0;
+          render();
+        });
+        a.appendChild(b);
+        p.appendChild(a);
+        stage.appendChild(p);
+      }
+
+      /* ---------------------------------------------------------------- render */
+
+      function render() {
+        setReadouts();
+        renderRail();
+        if (S.act === 0) return renderIntro();
+        if (S.act === 1) return renderMatch();
+        if (S.act === 2) return renderWalk();
+        if (S.act === 3) return S.step === -1 ? renderStreamIntro() : renderStream();
+        if (S.act === 4) return renderResult();
+      }
+
+      function renderIntro() {
+        stage.innerHTML = '';
+        const p = el('div', 'panel');
+        p.appendChild(el('p', 'eyebrow', 'An MP3, parsed by hand'));
+        p.appendChild(el('h1', '', 'You are the parser.'));
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            "An MP3 is frames laid end to end. Each holds about 26 milliseconds of sound and opens with four bytes saying how long it is. One frame near the front may <em>claim</em> a total — but that is the encoder's word about a file that may since have been cut or retagged. The only count you can stand behind is the one you walk to.",
+          ),
+        );
+        p.appendChild(
+          el(
+            'p',
+            'lede',
+            'Three acts, about ten minutes. Read a header, walk a file to its end, then do it again while the bytes are still arriving — which is what a server actually faces.',
+          ),
+        );
+        const act = el('div', 'actions');
+        const b = el('button', 'btn', 'Start');
+        b.type = 'button';
+        b.addEventListener('click', () => {
+          S.act = 1;
+          render();
+        });
+        act.appendChild(b);
+        p.appendChild(act);
+        stage.appendChild(p);
+      }
+
+      /**
+       * Appends options, feedback, and — only after them — the advance button.
+       *
+       * A correct answer is recorded in `S.solved` rather than left in the DOM,
+       * so inspecting a segment on the strip re-renders the screen without
+       * throwing the answer away.
+       */
+      function askOptions(box, key, options, wide, onRight) {
+        ask(key);
+        const opts = el('div', 'options');
+        const fb = el('div', 'feedback');
+        fb.style.display = 'none';
+        const actions = el('div', 'actions');
+
+        const show = (o, b) => {
+          b.classList.add('right');
+          opts.querySelectorAll('button').forEach((x) => (x.disabled = true));
+          fb.style.display = '';
+          fb.classList.remove('bad');
+          fb.classList.add('good');
+          fb.innerHTML = '<strong>Right.</strong> ' + o.why;
+          onRight(actions);
+        };
+
+        options.forEach((o) => {
+          const b = el('button', 'opt' + (wide ? ' wide' : ''), o.label);
+          b.type = 'button';
+          b.addEventListener('click', () => {
+            if (S.solved === key) return;
+            fb.style.display = '';
+            fb.classList.remove('good', 'bad');
+            if (o.ok) {
+              resolve(key);
+              S.solved = key;
+              show(o, b);
+            } else {
+              S.missed = true;
+              b.classList.add('wrong');
+              b.disabled = true;
+              fb.classList.add('bad');
+              fb.innerHTML = '<strong>No.</strong> ' + o.why;
+            }
+          });
+          opts.appendChild(b);
+        });
+
+        box.appendChild(opts);
+        box.appendChild(fb);
+        box.appendChild(actions);
+
+        if (S.solved === key) {
+          const i = options.findIndex((o) => o.ok);
+          show(options[i], opts.children[i]);
+        }
+      }
+
+      function renderWalk() {
+        stage.innerHTML = '';
+        const step = WALK[S.step];
+
+        const film = el('div', 'panel');
+        film.appendChild(buildStrip(false));
+        stage.appendChild(film);
+
+        const p = el('div', 'panel');
+        p.appendChild(
+          el('p', 'eyebrow', 'Act 2 of 3 · step ' + (S.step + 1) + ' of ' + WALK.length),
+        );
+
+        if (step.kind === 'formula') return renderFormula(p, step);
+
+        if (step.kind === 'jump' || step.seg !== undefined) {
+          const seg = S.file.segments[step.seg];
+          if (seg && seg.hdr) p.appendChild(fieldGrid(seg.hdr[0], seg.hdr[1], seg.hdr[2], false));
+        }
+
+        const box = el('div', 'ask');
+        box.appendChild(el('p', 'ask-q', step.q));
+        if (step.sub) box.appendChild(el('p', 'ask-q', '<strong>' + step.sub + '</strong>'));
+        if (step.kind === 'jump')
+          box.appendChild(el('p', 'ask-q', '<strong>Where does the next header begin?</strong>'));
+        p.appendChild(box);
+
+        if (step.kind === 'final') {
+          ask('walk:final');
+          const entry = el('div', 'number-entry');
+          const input = el('input');
+          input.type = 'number';
+          input.min = '0';
+          input.placeholder = 'count';
+          input.setAttribute('aria-label', 'your audio frame count');
+          const go = el('button', 'btn', 'Check');
+          go.type = 'button';
+          const fb = el('div', 'feedback');
+          fb.style.display = 'none';
+          const actions = el('div', 'actions');
+          const submit = () => {
+            if (input.value === '') return;
+            fb.style.display = '';
+            fb.classList.remove('good', 'bad');
+            if (Number(input.value) === step.answer) {
+              resolve('walk:final');
+              S.solved = 'walk:final';
+              fb.classList.add('good');
+              fb.innerHTML = '<strong>Five.</strong> ' + step.why;
+              go.remove();
+              input.disabled = true;
+              const nxt = el('button', 'btn', 'Do it while the file arrives →');
+              nxt.type = 'button';
+              nxt.addEventListener('click', startStream);
+              actions.appendChild(nxt);
+            } else {
+              S.missed = true;
+              fb.classList.add('bad');
+              fb.innerHTML =
+                Number(input.value) === 6
+                  ? '<strong>Six is right for frames on disk.</strong> The question asks for audio frames, and the Xing frame carries no sound.'
+                  : '<strong>Not quite.</strong> Count the frames you walked past, then decide what to do about the Xing frame.';
+            }
+          };
+          go.addEventListener('click', submit);
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submit();
+          });
+          entry.appendChild(input);
+          entry.appendChild(go);
+          box.appendChild(entry);
+          box.appendChild(fb);
+          box.appendChild(actions);
+          if (S.solved === 'walk:final') {
+            input.value = String(step.answer);
+            submit();
+          }
+          stage.appendChild(p);
+          return;
+        }
+
+        askOptions(box, 'walk:' + S.step, step.options, step.kind === 'choice', (actions) => {
+          const nxt = el('button', 'btn', 'Continue →');
+          nxt.type = 'button';
+          nxt.addEventListener('click', () => advance(step, WALK.length));
+          actions.appendChild(nxt);
+        });
+        stage.appendChild(p);
+      }
+
+      function renderFormula(p, step) {
+        const seg = S.file.segments[step.seg];
+        const [kbps, hz, pad] = seg.hdr;
+        ask('walk:' + S.step);
+        if (!S.blanks || S.blanks.step !== S.step)
+          S.blanks = { step: S.step, vals: [null, null, null] };
+
+        const need = S.blanks.vals.findIndex((v) => v === null);
+        S.activeBlank = need;
+
+        p.appendChild(fieldGrid(kbps, hz, pad, seg.kind === 'meta', need !== -1));
+        const box = el('div', 'ask');
+        box.appendChild(el('p', 'ask-q', step.q));
+        box.appendChild(
+          el(
+            'p',
+            'lede',
+            'Every frame holds 1152 samples of sound. Bitrate gives bits per second, 1152 ÷ sample rate gives seconds, and ÷ 8 turns bits into bytes. Fold the constants together and 1152 ÷ 8 = <strong>144</strong>.',
+          ),
+        );
+        p.appendChild(box);
+
+        const f = el('div', 'formula');
+        f.appendChild(el('span', '', 'length = floor( 144 &times;'));
+        const labels = [kbps * 1000 + '', hz + '', pad + ''];
+        const names = ['bitrate', 'rate', 'padding'];
+        [0, 1, 2].forEach((i) => {
+          f.appendChild(
+            el(
+              'span',
+              'blank' +
+                (S.blanks.vals[i] !== null ? ' filled' : S.activeBlank === i ? ' active' : ''),
+              S.blanks.vals[i] !== null ? labels[i] : names[i],
+            ),
+          );
+          if (i === 0) f.appendChild(el('span', '', '/'));
+          if (i === 1) f.appendChild(el('span', '', ') +'));
+        });
+        box.appendChild(f);
+
+        if (need === -1) {
+          resolve('walk:' + S.step);
+          const len = frameLen(kbps, hz, pad);
+          const fb = el('div', 'feedback good');
+          fb.innerHTML =
+            '<strong>' +
+            len +
+            ' bytes.</strong> The next header must begin at ' +
+            (seg.start + len) +
+            '.';
+          box.appendChild(fb);
+          const a = el('div', 'actions');
+          const nxt = el('button', 'btn', 'Jump to ' + (seg.start + len) + ' →');
+          nxt.type = 'button';
+          nxt.addEventListener('click', () => {
+            S.blanks = null;
+            advance(step, WALK.length);
+          });
+          a.appendChild(nxt);
+          box.appendChild(a);
+          stage.appendChild(p);
+          return;
+        }
+
+        box.appendChild(rateTables());
+        const prompts = [
+          'Bitrate for index ' + (BITRATES.indexOf(kbps) + 1) + ', in bits per second?',
+          'Sampling rate for index ' + RATES.indexOf(hz) + '?',
+          'What does the padding bit add?',
+        ];
+        box.appendChild(el('p', 'ask-q', '<strong>' + prompts[need] + '</strong>'));
+
+        const raw = [
+          [kbps * 1000, BITRATES[BITRATES.indexOf(kbps) + 1] * 1000, kbps],
+          [hz, 48000, 32000],
+          [0, 1],
+        ][need];
+        const right = [kbps * 1000, hz, pad][need];
+        const seen = new Set();
+        const choices = raw.filter((v) => !seen.has(v) && seen.add(v));
+
+        const opts = el('div', 'options');
+        const fb = el('div', 'feedback bad');
+        fb.style.display = 'none';
+        choices.forEach((v) => {
+          const b = el('button', 'opt', String(v));
+          b.type = 'button';
+          b.addEventListener('click', () => {
+            if (v === right) {
+              S.blanks.vals[need] = true;
+              render();
+            } else {
+              S.missed = true;
+              b.classList.add('wrong');
+              b.disabled = true;
+              fb.style.display = '';
+              fb.innerHTML =
+                need === 0
+                  ? '<strong>No.</strong> Index ' +
+                    (BITRATES.indexOf(kbps) + 1) +
+                    ' is ' +
+                    kbps +
+                    ' kbps, and the formula wants bits per second.'
+                  : need === 1
+                    ? '<strong>No.</strong> Index ' + RATES.indexOf(hz) + ' is ' + hz + ' Hz.'
+                    : '<strong>No.</strong> The padding bit reads ' + pad + '.';
+            }
+          });
+          opts.appendChild(b);
+        });
+        box.appendChild(opts);
+        box.appendChild(fb);
+        stage.appendChild(p);
+      }
+
+      function renderStream() {
+        stage.innerHTML = '';
+        const m = STREAM[S.step];
+
+        const film = el('div', 'panel');
+        film.appendChild(buildStrip(true));
+        stage.appendChild(film);
+
+        const p = el('div', 'panel');
+        p.appendChild(
+          el(
+            'p',
+            'eyebrow',
+            S.done
+              ? 'Act 3 of 3 · final count'
+              : 'Act 3 of 3 · decision ' + (S.step + 1) + ' of ' + STREAM.length,
+          ),
+        );
+
+        if (S.done) {
+          ask('stream:final');
+          const box = el('div', 'ask');
+          box.appendChild(el('p', 'ask-q', 'The upload is over and the head is on the last byte.'));
+          box.appendChild(
+            el('p', 'ask-q', '<strong>How many audio frames did this stream hold?</strong>'),
+          );
+          const entry = el('div', 'number-entry');
+          const input = el('input');
+          input.type = 'number';
+          input.min = '0';
+          input.placeholder = 'count';
+          input.setAttribute('aria-label', 'your audio frame count');
+          const go = el('button', 'btn', 'Check');
+          go.type = 'button';
+          const fb = el('div', 'feedback');
+          fb.style.display = 'none';
+          const actions = el('div', 'actions');
+          const submit = () => {
+            if (input.value === '') return;
+            fb.style.display = '';
+            fb.classList.remove('good', 'bad');
+            if (Number(input.value) === 5) {
+              resolve('stream:final');
+              S.solved = 'stream:final';
+              fb.classList.add('good');
+              fb.innerHTML =
+                '<strong>Five.</strong> And notice what you never did: hold the file. One offset, one pending frame, a running total, and 128 bytes kept back — the same cost whether the upload is 2 KB or 500 MB.';
+              go.remove();
+              input.disabled = true;
+              const nxt = el('button', 'btn', 'See how you did →');
+              nxt.type = 'button';
+              nxt.addEventListener('click', () => {
+                S.act = 4;
+                render();
+              });
+              actions.appendChild(nxt);
+            } else {
+              S.missed = true;
+              fb.classList.add('bad');
+              fb.innerHTML =
+                '<strong>Not quite.</strong> Count the frames you accepted, including the one the counter only reached once the upload ended.';
+            }
+          };
+          go.addEventListener('click', submit);
+          input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') submit();
+          });
+          entry.appendChild(input);
+          entry.appendChild(go);
+          box.appendChild(entry);
+          box.appendChild(fb);
+          box.appendChild(actions);
+          if (S.solved === 'stream:final') {
+            input.value = '5';
+            submit();
+          }
+          p.appendChild(box);
+          stage.appendChild(p);
+          return;
+        }
+
+        const at = S.file.segments.find((s) => s.start === m.at);
+        if (at && at.hdr) p.appendChild(fieldGrid(at.hdr[0], at.hdr[1], at.hdr[2], false));
+
+        const box = el('div', 'ask');
+        box.appendChild(el('p', 'ask-q', m.q));
+        box.appendChild(el('p', 'ask-q', '<strong>What do you do?</strong>'));
+        p.appendChild(box);
+
+        const options = VERDICTS.map(([key, label]) => ({
+          label,
+          ok: key === m.answer,
+          why: key === m.answer ? m.why : wrongWhy(key, m),
+        }));
+
+        askOptions(box, 'stream:' + S.step, options, true, (actions) => {
+          const waiting = m.answer === 'wait' && !m.then;
+          const nxt = el(
+            'button',
+            waiting ? 'btn chunk' : 'btn',
+            waiting ? 'Receive the next chunk ↓' : 'Continue →',
+          );
+          nxt.type = 'button';
+          nxt.addEventListener('click', () => advance(m, STREAM.length));
+          actions.appendChild(nxt);
+        });
+        stage.appendChild(p);
+      }
+
+      function wrongWhy(picked, m) {
+        if (picked === 'scan')
+          return (
+            'There is a perfectly good header at this offset — nothing is wrong with the file. ' +
+            'Scanning forward is what the counter does when a header is <em>not</em> where the last ' +
+            'frame said it would be: it gives up sync and steps a byte at a time looking for one. ' +
+            'That happens to damaged files, and to files that were never audio at all, which is the ' +
+            'case that actually matters — it is why a photograph is reported as containing no frames ' +
+            'instead of a made-up number. In a well-formed stream like this one it never fires.'
+          );
+        if (picked === 'count')
+          return 'Some of this frame is not readable yet. Count it now and a file that gets cut off would be reported as longer than it is.';
+        return 'Everything this frame needs is already here, and it is already proven. Waiting changes nothing.';
+      }
+
+      /** Applies a step's effects and moves on. Shared by both acts. */
+      function advance(step, total) {
+        const t = step.then || {};
+        if (t.reveal) t.reveal.forEach((i) => S.revealed.add(i));
+        if (t.cursor !== undefined) S.cursor = t.cursor;
+        if (t.count) S.counted += t.count;
+        if (t.physical) S.physical += t.physical;
+        if (S.act === 3 && step.answer === 'wait' && !t.ends) {
+          S.chunkIndex += 1;
+          S.frontier = Math.min(S.file.total, S.frontier + (S.file.chunks[S.chunkIndex] || 0));
+        }
+        if (t.ends) S.done = true;
+        S.step += 1;
+        S.selected = null;
+        S.askedKey = null;
+        S.solved = null;
+        if (S.act === 3 && S.step >= total) S.done = true;
+        render();
+      }
+
+      /* ---------------------------------------------------------------- result */
+
+      function renderResult() {
+        stage.innerHTML = '';
+        const pct = S.asked ? Math.round((S.clean / S.asked) * 100) : 0;
+        const p = el('div', 'panel');
+        p.appendChild(el('p', 'eyebrow', 'Result'));
+        p.appendChild(
+          el(
+            'h2',
+            '',
+            pct === 100
+              ? 'Clean run. You parsed both files without a wrong move.'
+              : pct >= 75
+                ? 'Solid. You found both counts, with a few detours.'
+                : 'Both counts found, with some wrong turns.',
+          ),
+        );
+
+        const card = el('div', 'scorecard');
+        const add = (v, l) => {
+          const d = el('div', 'score');
+          d.appendChild(el('b', '', v));
+          d.appendChild(el('span', 'readout-label', l));
+          card.appendChild(d);
+        };
+        add(S.clean + '/' + S.asked, 'first-try answers');
+        add(pct + '%', 'clean rate');
+        add('5', 'frames, file 1');
+        add('5', 'frames, file 2');
+        p.appendChild(card);
+
+        p.appendChild(el('h3', '', 'What you did'));
+        const t = el('div', 'takeaways');
+        [
+          [
+            'Length',
+            'Every frame declares its own size. You never searched for the next one — you calculated where it had to be.',
+          ],
+          [
+            'Metadata',
+            "The first frame may be a Xing, Info or VBRI table with no sound in it. A frame, but not part of the answer. On this project's mono <code>cbr-64-mono-info.mp3</code>, mediainfo counts it and ffprobe does not.",
+          ],
+          [
+            'Tags',
+            'ID3v2 at the front and ID3v1 at the back are text. Skipping them by declared length is what stops their contents being read as frames.',
+          ],
+          [
+            'Evidence',
+            'A stream begins unproven, so the first frame needs a second header one frame later to agree before it is believed. Eleven set bits turn up by accident in ordinary data; two accidents agreeing to the byte do not. That check is what stops an arbitrary file being reported as an MP3 — the same rule also recovers from damage, but that is a side effect, not its purpose.',
+          ],
+          [
+            'Held back',
+            'The last 128 bytes of a stream are never read until it ends, because they may be a tag. That one rule is why the counter has an <code>end()</code> at all.',
+          ],
+          [
+            'Memory',
+            'One offset, one pending frame, a running total. That is all a server needs, whether the upload is 2 KB or 500 MB.',
+          ],
+        ].forEach(([k, v]) => {
+          const row = el('div', 'takeaway');
+          row.appendChild(el('span', 'k', k));
+          row.appendChild(el('span', 'v', v));
+          t.appendChild(row);
+        });
+        p.appendChild(t);
+
+        p.appendChild(el('h3', '', 'Where this lives in the repository'));
+        const links = el('div', 'takeaways');
+        [
+          [
+            'src',
+            '<a href="https://github.com/otaha2/mp3-frame-counter/blob/main/src/mp3/frameCounter.ts"><code>src/mp3/frameCounter.ts</code></a> — the walk you just did, as a state machine fed one chunk at a time. Its <code>judge()</code> returns the same three answers your buttons did.',
+          ],
+          [
+            'src',
+            '<a href="https://github.com/otaha2/mp3-frame-counter/blob/main/src/mp3/frameHeader.ts"><code>src/mp3/frameHeader.ts</code></a> — the four bytes of act 1, and the six ways a header is rejected.',
+          ],
+          [
+            'docs',
+            '<a href="https://github.com/otaha2/mp3-frame-counter/blob/main/docs/concepts/counting-as-bytes-arrive.html">Counting as bytes arrive</a> — act 3 written out, with a real trace.',
+          ],
+          [
+            'truth',
+            '<a href="https://github.com/otaha2/mp3-frame-counter/blob/main/docs/evidence/sample-ground-truth.html">Sample ground truth</a> — where the expected counts come from, and why two reference tools disagree.',
+          ],
+        ].forEach(([k, v]) => {
+          const row = el('div', 'takeaway');
+          row.appendChild(el('span', 'k', k));
+          row.appendChild(el('span', 'v', v));
+          links.appendChild(row);
+        });
+        p.appendChild(links);
+
+        const a = el('div', 'actions');
+        const again = el('button', 'btn ghost', 'Play again');
+        again.type = 'button';
+        again.addEventListener('click', () => {
+          Object.assign(S, {
+            act: 0,
+            step: 0,
+            counted: 0,
+            physical: 0,
+            cursor: 0,
+            frontier: 0,
+            chunkIndex: 0,
+            revealed: new Set(),
+            selected: null,
+            asked: 0,
+            clean: 0,
+            missed: false,
+            askedKey: null,
+            resolvedKey: null,
+            solved: null,
+            blanks: null,
+            links: {},
+            rightOrder: null,
+            pick: null,
+            matchMiss: null,
+            done: false,
+            answered: false,
+          });
+          render();
+        });
+        a.appendChild(again);
+        p.appendChild(a);
+        stage.appendChild(p);
+      }
+
+      render();
+    </script>
+  </body>
+</html>

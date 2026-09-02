@@ -15,8 +15,9 @@
 
     <h2>The order to read these in</h2>
     <p>
-      The domain first, then the system, then the measurements backing it up. Each step assumes the
-      ones above it.
+      The domain first, then the system, then the measurements backing it up — and last a
+      walkthrough that hands you the job and finds out what stuck. Each step assumes the ones above
+      it.
     </p>
     <table>
       <tr>
@@ -49,7 +50,38 @@
         <td><a href="evidence/streaming-memory.html">Streaming counter measurements</a></td>
         <td>Chunk-size invariance, memory over 417 MB, and a 146 MB upload end to end.</td>
       </tr>
+      <tr>
+        <th>7</th>
+        <td>
+          <a href="play/frame-walker.html"><strong>Frame Walker</strong></a>
+        </td>
+        <td>Do it yourself on two files, and find out what you actually absorbed.</td>
+      </tr>
     </table>
+
+    <div class="callout">
+      <h2>Frame Walker — the checkpoint at step 7</h2>
+      <p>
+        A playable walkthrough that hands you the parser's job. Decode a header field by field, walk
+        a file frame by frame to its end deciding where each one lands, then count a second file
+        while its bytes are still arriving — waiting when a frame is incomplete, and waiting again
+        when it is complete but not yet proven.
+      </p>
+      <p>
+        It is a check, not an introduction. Read steps 1 to 6 first and it will confirm what you
+        understood and expose what you skimmed. Open it cold and it will teach you the same material
+        the hard way. Ten minutes either way.
+      </p>
+      <p>
+        The two files it uses are not illustrations. <code>test/docs/frameWalker.test.ts</code>
+        rebuilds both as real MP3 bytes and checks this project's own counter returns the offsets,
+        lengths and totals the walkthrough teaches, so the page cannot drift from the code —
+        <a href="decisions.md">decisions.md</a> D22.
+      </p>
+      <p>
+        <a href="play/frame-walker.html"><strong>Play Frame Walker →</strong></a>
+      </p>
+    </div>
 
     <h2>Also here</h2>
     <table>

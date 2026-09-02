@@ -135,7 +135,7 @@ solved here.
 src/mp3/     frame parsing and counting — Node builtins only, no framework
 src/http/    Fastify app, routes, typed errors, one error handler
 test/        mirrors src/; fixtures hold the MP3s and their verified counts
-docs/        the knowledge log
+docs/        the knowledge log, including a walkthrough you can play
 ```
 
 The dependency arrow points one way: `src/http/` knows about `src/mp3/`, never
@@ -146,11 +146,18 @@ with hand-built byte arrays and would drop into a CLI unchanged.
 
 `docs/` is a knowledge log rather than a manual. Most of the work here was
 learning how MP3 files are laid out, and that knowledge is worth writing down
-once rather than rediscovering. Pages come in three kinds — **concept** for
-domain knowledge, **evidence** for anything measured with an outside tool, and
+once rather than rediscovering. Pages come in four kinds — **concept** for
+domain knowledge, **evidence** for anything measured with an outside tool,
 **model** for the shape of the system, which is where the scalability story
-lives. Reasoning is not repeated in them; it stays in
-[decisions.md](docs/decisions.md) and is linked.
+lives, and **play**, which is one page. Reasoning is not repeated in them; it
+stays in [decisions.md](docs/decisions.md) and is linked.
+
+[docs/play/frame-walker.html](docs/play/frame-walker.html) is a walkthrough that
+hands the reader the job: decode a header, walk a file frame by frame to its
+end, then count a second file while its bytes are still arriving. It is the
+fastest way into the domain, and the two files it uses are not illustrations —
+`test/docs/frameWalker.test.ts` rebuilds them as real MP3 bytes and checks this
+parser returns the numbers the page teaches.
 
 [docs/index.html](docs/index.html) is the only table of contents.
 
