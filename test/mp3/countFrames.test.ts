@@ -7,6 +7,7 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { countFrames } from '../../src/mp3/countFrames';
+import { ID3V1_TAG_BYTES, ID3V2_HEADER_BYTES } from '../../src/mp3/tags';
 import { frame, frameLength, id3v1Tag, id3v2Tag, metadataFrame } from '../helpers/mp3';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
@@ -99,6 +100,26 @@ describe('countFrames on synthetic streams', () => {
 
       expect(countFrames(bytes)).toMatchObject({ frameCount: 3, resyncedBytes: 0 });
     });
+
+    describe('the limits of trusting what a file says about itself', () => {
+      // Both cases below are known and accepted, not defects. They are pinned
+      // so that a change to tag handling has to face them deliberately.
+
+      it('loses the last frame to audio that imitates an ID3v1 tail', () => {
+        const bytes = Buffer.concat([stream(4)]);
+        bytes.write('TAG', bytes.length - ID3V1_TAG_BYTES, 'latin1');
+
+        expect(countFrames(bytes).frameCount).toBe(3);
+      });
+
+      it('finds no frames when an ID3v2 header declares more bytes than exist', () => {
+        const oversized = Buffer.alloc(ID3V2_HEADER_BYTES);
+        oversized.write('ID3', 0, 'latin1');
+        oversized.fill(0x7f, 6, 10); // syncsafe 0x0FFFFFFF — far past the end
+
+        expect(countFrames(Buffer.concat([oversized, stream(4)])).frameCount).toBe(0);
+      });
+    });
   });
 
   describe('damaged streams', () => {
@@ -120,6 +141,17 @@ describe('countFrames on synthetic streams', () => {
       const truncated = Buffer.concat([stream(3), frame().subarray(0, 100)]);
 
       expect(countFrames(truncated).frameCount).toBe(3);
+    });
+
+    it('counts a lone frame that ends exactly at the end of the stream', () => {
+      // No confirming header can follow the last frame in a file, so the
+      // end-of-stream case is the one place a single header is believed.
+      // Without this a one-frame file would be reported as holding none.
+      expect(countFrames(frame()).frameCount).toBe(1);
+    });
+
+    it('does not count a lone frame that is one byte short of complete', () => {
+      expect(countFrames(frame().subarray(0, frameLength() - 1)).frameCount).toBe(0);
     });
 
     it('does not count an isolated sync word in unrelated data', () => {

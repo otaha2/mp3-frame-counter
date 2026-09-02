@@ -28,10 +28,13 @@ const SYNCSAFE_MAX_BYTE = 0x7f;
 /**
  * Total bytes occupied by a leading ID3v2 tag, or 0 if there is none.
  *
- * The size is stored syncsafe — four bytes of seven bits each — precisely so
- * that no byte of the tag can be mistaken for the 0xFF of a frame sync word.
- * A size byte with its high bit set means the field is malformed, so the tag
- * is not trusted and the file is scanned from the start instead.
+ * The size is stored syncsafe — four bytes of seven bits each — so that the
+ * size field itself can never contain 0xFF and be misread as the start of a
+ * frame. The tag body has no such protection and routinely does contain 0xFF,
+ * album art being the usual culprit, which is why the tag must be skipped by
+ * its declared size rather than scanned. A size byte with its high bit set
+ * means the field is malformed, so the tag is not trusted and the file is
+ * scanned from the start instead.
  */
 export function id3v2TagSizeBytes(bytes: Buffer): number {
   if (bytes.length < ID3V2_HEADER_BYTES) return 0;

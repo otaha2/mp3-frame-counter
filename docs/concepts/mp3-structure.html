@@ -42,7 +42,10 @@
         <strong>ID3v2</strong> (start, optional): 10-byte header
         <code>"ID3" ver(2) flags(1) size(4)</code>. The size is <em>syncsafe</em> — 4 bytes of 7
         bits each (<code>(b6&lt;&lt;21)|(b7&lt;&lt;14)|(b8&lt;&lt;7)|b9</code>), covering the tag
-        body after the 10-byte header. Skipped, never parsed.
+        body after the 10-byte header. Seven-bit packing keeps the size field itself from ever
+        holding 0xFF and being misread as a frame start. The body has no such protection and often
+        contains 0xFF runs inside album art, which is why the tag is skipped by its declared size
+        and never scanned.
       </li>
       <li>
         <strong>ID3v1</strong> (end, optional): exactly 128 bytes beginning <code>"TAG"</code> at
@@ -55,7 +58,9 @@
         <code>"Xing"</code> into a variable-bitrate file and <code>"Info"</code> into a
         constant-bitrate one. The marker sits 36 bytes into the frame for MPEG-1 stereo: past the
         4-byte header and 32 bytes of <em>side information</em>, a block describing how that frame's
-        audio was packed. <code>"VBRI"</code> is a rarer variant, always at offset 36. Its stored
+        audio was packed. A mono frame has only one channel to describe, so its side information is
+        17 bytes and the marker sits at offset 21 — the reader must know the channel mode before it
+        knows where to look. <code>"VBRI"</code> is a rarer variant, always at offset 36. Its stored
         frame and byte counts describe the rest of the stream. Counting policy: see
         <a href="../decisions.md">decisions.md</a> D1.
       </li>
@@ -199,24 +204,101 @@
         <rect class="box" x="460" y="40" width="200" height="40" />
         <text x="520" y="65">audio data</text>
         <!-- jump arrows -->
-        <path class="arrow" d="M30,38 C 80,5 210,5 268,36" stroke="currentColor" />
-        <path class="arrow" d="M270,38 C 305,12 400,12 438,36" stroke="currentColor" />
-        <text class="lbl" x="80" y="18">+floor(144·64000/44100)+0 = 208 B</text>
-        <text class="lbl" x="315" y="26">+104 B (32 kbps)</text>
+        <path class="arrow" d="M30,38 C 90,24 200,24 268,36" stroke="currentColor" />
+        <path class="arrow" d="M270,38 C 310,24 400,24 438,36" stroke="currentColor" />
+        <text class="lbl" x="52" y="15">+floor(144·64000/44100)+0 = 208 B</text>
+        <text class="lbl" x="313" y="15">+104 B (32 kbps)</text>
         <!-- byte offsets from the sample -->
         <text class="lbl" x="10" y="105">offset 44</text>
         <text class="lbl" x="250" y="105">offset 252</text>
         <text class="lbl" x="420" y="105">offset 356</text>
-        <text class="lbl" x="10" y="135">
-          Each header alone determines the distance to the next header — sizes taken from the
-          sample's first three frames.
-        </text>
       </svg>
       <figcaption>
         The frame walk: parse 4 bytes, compute the length, jump. VBR just means the jump distance
         changes per frame.
       </figcaption>
     </figure>
+
+    <h2>One header, decoded</h2>
+    <p>
+      The four bytes at offset 44 of <code>test/fixtures/sample.mp3</code> are
+      <code>FF FB 50 00</code>. Written out in bits, with each field marked by its letter from the
+      table above:
+    </p>
+    <pre><code>    FF         FB         50         00
+ 1111 1111  1111 1011  0101 0000  0000 0000
+ AAAA AAAA  AAAB BCCD  EEEE FFGH  IIJJ KLMN</code></pre>
+    <table>
+      <tr>
+        <th>Field</th>
+        <th>Bits</th>
+        <th>Value</th>
+        <th>Meaning</th>
+      </tr>
+      <tr>
+        <td>A — sync</td>
+        <td><code>111 1111 1111</code></td>
+        <td>0x7FF</td>
+        <td>All eleven set. This is where a frame may begin.</td>
+      </tr>
+      <tr>
+        <td>B — version</td>
+        <td><code>11</code></td>
+        <td>3</td>
+        <td>MPEG-1. Anything else is refused.</td>
+      </tr>
+      <tr>
+        <td>C — layer</td>
+        <td><code>01</code></td>
+        <td>1</td>
+        <td>Layer III. Anything else is refused.</td>
+      </tr>
+      <tr>
+        <td>D — CRC</td>
+        <td><code>1</code></td>
+        <td>—</td>
+        <td>Not protected, so no checksum follows. Either value is accepted.</td>
+      </tr>
+      <tr>
+        <td>E — bitrate</td>
+        <td><code>0101</code></td>
+        <td>5</td>
+        <td>Index 5 in the table above → 64 kbps.</td>
+      </tr>
+      <tr>
+        <td>F — sampling rate</td>
+        <td><code>00</code></td>
+        <td>0</td>
+        <td>44100 Hz.</td>
+      </tr>
+      <tr>
+        <td>G — padding</td>
+        <td><code>0</code></td>
+        <td>0</td>
+        <td>No extra byte on this frame.</td>
+      </tr>
+      <tr>
+        <td>H–N</td>
+        <td><code>0 0000 0000</code></td>
+        <td>—</td>
+        <td>
+          Private bit, then channel mode <code>00</code> = stereo, then flags this parser does not
+          read.
+        </td>
+      </tr>
+    </table>
+    <p>
+      So the frame is <mark>208 bytes</mark> long:
+      <code>floor(144 × 64000 / 44100) + 0 = floor(208.9…) = 208</code>. The next header must
+      therefore begin at offset 44 + 208 = 252 — and it does, which is the whole of the walk.
+    </p>
+    <p>
+      Two details of this particular frame are worth noticing. Its channel mode says
+      <em>stereo</em>, while every audio frame in the file says <em>joint stereo</em>: it is the
+      Xing frame, and the encoder wrote it with different settings from the audio it describes. And
+      at 64 kbps it is much larger than the 32 kbps frames that follow it — the metadata frame is
+      sized to hold its table, not its (absent) audio.
+    </p>
 
     <p>
       See the <a href="../evidence/sample-ground-truth.html">sample ground-truth page</a> for these

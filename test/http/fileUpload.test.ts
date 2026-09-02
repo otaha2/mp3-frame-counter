@@ -297,6 +297,26 @@ describe('POST /file-upload', () => {
     });
   });
 
+  it('reports an unexpected failure without describing it', async () => {
+    // The suppression is deliberate: Fastify's default handler echoes the raw
+    // exception message, which would put internal paths in the response body.
+    app = build();
+    app.get('/boom', () => {
+      throw new Error('a secret internal detail');
+    });
+
+    const response = await app.inject({ method: 'GET', url: '/boom' });
+
+    expect(response.statusCode).toBe(500);
+    expect(response.json<ErrorBody>()).toEqual({
+      statusCode: 500,
+      code: 'INTERNAL_ERROR',
+      error: 'Internal Server Error',
+      message: 'An unexpected error occurred.',
+    });
+    expect(response.body).not.toContain('secret internal detail');
+  });
+
   describe('routing failures use the same error shape', () => {
     it('answers 404 with a code for an unknown route', async () => {
       app = build();

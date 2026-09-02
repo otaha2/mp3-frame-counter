@@ -133,14 +133,20 @@ header marks the start of a frame?
 **Options.** (a) One valid-looking header. (b) Two, the second exactly one frame
 length after the first.
 
-**Decision.** (b). A frame whose declared length runs past the end of the audio
-is also not counted.
+**Decision.** (b), with one exception: when the stream has ended and the
+candidate's length lands exactly on the last byte, it is accepted without
+confirmation, because no confirming header can ever arrive and a file holding a
+single frame should not count as zero. A frame whose declared length runs past
+the end of the audio is not counted.
 
 **Why.** Eleven set bits followed by plausible fields occur readily inside
 compressed payload and unrelated binary files, so (a) would give an arbitrary
 file a non-zero frame count — and a file that is not an MP3 has to be reported
 as an error rather than a number. The second header costs one extra read per
-resync and nothing at all while in sync.
+resync and nothing at all while in sync. The end-of-stream exception can in
+principle credit one frame to four bytes of noise that both parse as a header
+and declare a length reaching exactly the last byte; the error is bounded at one
+frame, against a real file that would otherwise be miscounted.
 
 **Evidence.** [The counting rules](concepts/frame-counting.html)
 
@@ -259,10 +265,11 @@ table rather than hardcoded, so the answer stays correct if a route is added.
 
 **Options.** (a) Read every part so the answer is deterministic, counting the
 first file. (b) Reject the request, which also requires reading all of it.
-(c) Treat it as out of scope: read the first file, promise only that the
-response is never a 5xx.
+(c) Treat it as out of scope, promising only that the response is never a 5xx.
 
-**Decision.** (c).
+**Decision.** (c). Measured, the answer is a count for the first file when the
+parts are small and a `400 UNREADABLE_UPLOAD` when the second arrives before the
+first has been read. Which one you get is not promised; that it is not a 5xx is.
 
 **Why.** The brief asks for one MP3 per request, so several files is a caller
 error rather than a feature to build. Both (a) and (b) mean reading a body that

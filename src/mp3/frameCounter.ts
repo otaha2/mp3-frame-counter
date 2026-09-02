@@ -24,7 +24,11 @@ export interface FrameCountResult {
   readonly physicalFrames: number;
   /** Whether the stream opened with a metadata frame. */
   readonly hasVbrMetadataFrame: boolean;
-  /** Bytes discarded while searching for sync; 0 for an undamaged stream. */
+  /**
+   * Bytes passed over while searching for sync. Zero for a well-formed single
+   * file; non-zero also for anything legal this parser does not model, such as
+   * a tag appearing part-way through a stream.
+   */
   readonly resyncedBytes: number;
 }
 

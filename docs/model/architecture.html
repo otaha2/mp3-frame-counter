@@ -81,8 +81,8 @@
         <path class="arrow" d="M312,52 L356,52" stroke="currentColor" />
         <path class="arrow" d="M512,52 L552,52" stroke="currentColor" />
         <text class="lbl" x="500" y="24">chunks</text>
-        <path class="arrow" d="M620,78 C 620,120 540,120 470,120" stroke="currentColor" />
-        <text class="lbl" x="560" y="140">frameCount</text>
+        <path class="arrow" d="M620,78 C 620,116 540,116 474,80" stroke="currentColor" />
+        <text class="lbl" x="540" y="112">frameCount</text>
 
         <!-- error path -->
         <path class="arrow" d="M430,78 L432,176" stroke="currentColor" />
@@ -123,39 +123,49 @@
 
     <figure>
       <svg
-        viewBox="0 0 700 150"
+        viewBox="0 0 700 215"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
-        aria-label="Every chunk is accumulated into one buffer holding the whole file, counted in a single pass once the upload ends"
+        aria-label="Across one upload, bytes held rises by one step for every chunk and approaches the configured limit, while the frame count stays at zero until a single jump on the last byte"
       >
-        <defs>
-          <marker id="v1Arrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
-            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
-          </marker>
-        </defs>
+        <!-- The ceiling. It is drawn in both diagrams at the same height so the
+             two shapes below can be compared directly. -->
+        <text class="lbl" x="60" y="24">MAX_UPLOAD_BYTES</text>
+        <path d="M60,30 L622,30" stroke="currentColor" stroke-dasharray="4 4" fill="none" />
 
-        <rect class="box" x="10" y="14" width="52" height="30" />
-        <text class="lbl" x="22" y="34">chunk</text>
-        <rect class="box" x="70" y="14" width="52" height="30" />
-        <text class="lbl" x="82" y="34">chunk</text>
-        <rect class="box" x="130" y="14" width="52" height="30" />
-        <text class="lbl" x="142" y="34">chunk</text>
-        <text class="lbl" x="190" y="34">…</text>
+        <!-- Bytes held: one step per chunk, nothing ever released. -->
+        <path
+          class="box"
+          d="M60,165 L100,165 L100,146 L180,146 L180,128 L260,128 L260,110 L340,110 L340,92
+             L420,92 L420,74 L500,74 L500,56 L580,56 L580,38 L616,38 L616,165 Z"
+        />
+        <text class="lbl" x="112" y="122">every chunk is kept</text>
 
-        <path d="M36,46 L36,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
-        <path d="M96,46 L60,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
-        <path d="M156,46 L84,70" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
+        <!-- Frames counted: nothing, and then everything. -->
+        <path class="hot" d="M60,157 L616,157 L616,40" />
+        <circle cx="616" cy="40" r="4" fill="var(--accent)" />
+        <text class="lbl" x="604" y="52" text-anchor="end">one pass, after the last byte</text>
 
-        <rect class="box" x="10" y="74" width="440" height="34" />
-        <text class="lbl" x="24" y="96">one buffer holding the entire file</text>
-        <path d="M456,91 L500,91" stroke="currentColor" fill="none" marker-end="url(#v1Arrow)" />
-        <rect class="box" x="506" y="74" width="120" height="34" />
-        <rect class="hot" x="506" y="74" width="120" height="34" />
-        <text class="lbl" x="520" y="96">count once</text>
+        <path d="M55,165 L630,165" stroke="currentColor" fill="none" />
+        <path
+          d="M100,165 L100,171 M180,165 L180,171 M260,165 L260,171 M340,165 L340,171
+             M420,165 L420,171 M500,165 L500,171 M580,165 L580,171"
+          stroke="currentColor"
+          fill="none"
+        />
+        <text class="lbl" x="60" y="186">a chunk arrives at each mark</text>
+        <text class="lbl" x="630" y="186" text-anchor="end">end of upload</text>
 
-        <text class="lbl" x="10" y="132">nothing is counted until the last byte arrives</text>
+        <rect class="box" x="60" y="198" width="16" height="11" />
+        <text class="lbl" x="82" y="208">bytes held</text>
+        <path class="hot" d="M186,203 L212,203" />
+        <text class="lbl" x="218" y="208">frames counted</text>
       </svg>
-      <figcaption>Held: the whole upload, up to <code>MAX_UPLOAD_BYTES</code>.</figcaption>
+      <figcaption>
+        The grey area is the file itself, accumulating. The count is a single event at the
+        right-hand edge, which is why the ceiling has to exist: without it the grey area has no
+        bound.
+      </figcaption>
     </figure>
 
     <h2>v2 — streaming counter (current)</h2>
@@ -172,40 +182,48 @@
 
     <figure>
       <svg
-        viewBox="0 0 700 150"
+        viewBox="0 0 700 215"
         xmlns="http://www.w3.org/2000/svg"
         role="img"
-        aria-label="Each chunk is counted as it arrives, leaving only a partial header, a position within the current frame, and 128 withheld bytes"
+        aria-label="Across the same upload on the same scale, bytes held stays a flat hairline along the baseline while the frame count rises by one step for every chunk"
       >
-        <defs>
-          <marker id="v2Arrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
-            <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
-          </marker>
-        </defs>
+        <text class="lbl" x="60" y="24">MAX_UPLOAD_BYTES</text>
+        <path d="M60,30 L622,30" stroke="currentColor" stroke-dasharray="4 4" fill="none" />
 
-        <rect class="box" x="10" y="14" width="52" height="30" />
-        <text class="lbl" x="22" y="34">chunk</text>
-        <rect class="box" x="70" y="14" width="52" height="30" />
-        <text class="lbl" x="82" y="34">chunk</text>
-        <rect class="box" x="130" y="14" width="52" height="30" />
-        <text class="lbl" x="142" y="34">chunk</text>
-        <text class="lbl" x="190" y="34">…</text>
+        <!-- Frames counted: one step per chunk, the answer always current. -->
+        <path
+          class="hot"
+          d="M60,157 L100,157 L100,141 L180,141 L180,124 L260,124 L260,107 L340,107 L340,91
+             L420,91 L420,74 L500,74 L500,57 L580,57 L580,40 L616,40"
+        />
+        <circle cx="616" cy="40" r="4" fill="var(--accent)" />
+        <text class="lbl" x="604" y="140" text-anchor="end">
+          the same total, reached on the way
+        </text>
 
-        <path d="M62,29 L68,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
-        <path d="M122,29 L128,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
-        <path d="M210,29 L250,29" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
+        <!-- Bytes held: the same scale as above, and this is all of it. -->
+        <path class="box" d="M60,165 L616,165 L616,159 L60,159 Z" />
+        <text class="lbl" x="140" y="154">held: a header, an offset, 128 bytes</text>
 
-        <rect class="box" x="256" y="12" width="150" height="34" />
-        <rect class="hot" x="256" y="12" width="150" height="34" />
-        <text class="lbl" x="268" y="34">count on arrival</text>
+        <path d="M55,165 L630,165" stroke="currentColor" fill="none" />
+        <path
+          d="M100,165 L100,171 M180,165 L180,171 M260,165 L260,171 M340,165 L340,171
+             M420,165 L420,171 M500,165 L500,171 M580,165 L580,171"
+          stroke="currentColor"
+          fill="none"
+        />
+        <text class="lbl" x="60" y="186">a chunk arrives at each mark</text>
+        <text class="lbl" x="630" y="186" text-anchor="end">end of upload</text>
 
-        <path d="M331,48 L331,74" stroke="currentColor" fill="none" marker-end="url(#v2Arrow)" />
-        <rect class="box" x="206" y="78" width="250" height="34" />
-        <text class="lbl" x="218" y="99">carried over: header, offset, 128 bytes</text>
-
-        <text class="lbl" x="10" y="132">the count is current at every moment</text>
+        <rect class="box" x="60" y="198" width="16" height="11" />
+        <text class="lbl" x="82" y="208">bytes held</text>
+        <path class="hot" d="M186,203 L212,203" />
+        <text class="lbl" x="218" y="208">frames counted</text>
       </svg>
-      <figcaption>Held: about a kilobyte, whatever the size of the file.</figcaption>
+      <figcaption>
+        The two shapes have swapped. What rises is now the answer rather than the memory, and the
+        grey area is a hairline on the same scale that the previous diagram filled.
+      </figcaption>
     </figure>
 
     <table>
@@ -221,7 +239,7 @@
       </tr>
       <tr>
         <th>Concurrent large uploads</th>
-        <td>Each holds its own buffer; 10 at once is ~2 GiB</td>
+        <td>Each holds its own buffer; ten at the 512 MiB limit is ~5 GiB</td>
         <td>Cost is the same as one</td>
       </tr>
       <tr>
@@ -237,10 +255,11 @@
 
     <h2>Current state</h2>
     <p>
-      Both upload paths count incrementally. The endpoint answers with a count verified against
-      <code>mediainfo</code> for every file in <code>test/fixtures/</code>, and the answer is
-      unchanged whether the bytes arrive one at a time or all at once. Rationale for each choice is
-      in <a href="../decisions.md">decisions.md</a>.
+      Both upload paths count incrementally. Every count is checked against outside tools —
+      <code>mediainfo</code> and <code>ffprobe</code> agree on most fixtures, and where they
+      disagree the reasoning is recorded in <a href="../decisions.md">decisions.md</a> D11 and D17 —
+      and the answer is unchanged whether the bytes arrive one at a time or all at once. Rationale
+      for each choice is in <a href="../decisions.md">decisions.md</a>.
     </p>
   </body>
 </html>

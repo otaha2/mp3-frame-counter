@@ -84,6 +84,11 @@
         does both. A file with no frames at all is answered with a 400 naming the format that is
         supported, rather than a cheerful count of zero.
       </p>
+      <p>
+        The second opinion is waived in one case only: a candidate whose length ends exactly on the
+        last byte of the stream, where no confirming header can ever arrive. That is what lets a
+        file holding a single frame be counted as one rather than none.
+      </p>
       <p><a href="concepts/frame-counting.html">Why one sync word is not enough →</a></p>
     </details>
 
@@ -91,13 +96,15 @@
       <summary>Why is the upload counted as it arrives instead of being read first?</summary>
       <p>
         Because nothing about counting needs the whole file. A frame is decided entirely by its own
-        four-byte header, so the reader carries a fixed amount of state — a partial header split
-        across two chunks, and how far it is into the current frame — and discards everything else
-        as it goes. Counting 417 MB peaks at 13.9 MB, where the earlier design that buffered the
-        file needed 425 MB for the same input. The same holds across requests: eight simultaneous
-        146 MB uploads put over a gigabyte in flight and never took the server past 99 MB. The
-        configured size limit therefore bounds how large a request may be, not how much memory one
-        costs.
+        four-byte header, so the reader carries a fixed amount of state and discards everything else
+        as it goes. Three things are held: how far it is into the current frame, which is a number
+        rather than the bytes themselves; one unconfirmed frame while sync is being re-established,
+        because judging it needs the header that follows it; and the last 128 bytes of the stream,
+        which are released only at the end, once they are known not to be an ID3v1 tag. Counting 417
+        MB peaks at 13.9 MB, where the earlier design that buffered the file needed 425 MB for the
+        same input. The same holds across requests: eight simultaneous 146 MB uploads put over a
+        gigabyte in flight and never took the server past 99 MB. The configured size limit therefore
+        bounds how large a request may be, not how much memory one costs.
       </p>
       <p><a href="model/architecture.html">The buffered and streaming designs compared →</a></p>
     </details>
@@ -145,9 +152,20 @@
         naming the format that is supported — handled deliberately rather than by accident.
         Free-format files are rejected for a sharper reason: they do not declare a bitrate, so a
         frame's length cannot be derived from its own header and the jump-by-length approach does
-        not apply to them at all. A request carrying more than one file is not supported either: the
-        first file is read, and the only promise made is that a caller's mistake is never reported
-        as a server error. Each of these is named in the README alongside what happens instead.
+        not apply to them at all. A request carrying more than one file is not supported either.
+        Depending on how the parts happen to arrive, the answer is a count for the first file or a
+        400; the only promise made is that a caller's mistake is never reported as a server error.
+        Each of these is named in the README alongside what happens instead.
+      </p>
+      <p>
+        Two smaller boundaries follow from taking the file at its word, which is the only thing a
+        reader can do. An ID3v1 tag is recognised by the letters <code>TAG</code> exactly 128 bytes
+        from the end, so audio that happens to hold those three bytes at that offset is read as a
+        tag and dropped — costing at most the final frame. And an ID3v2 header declaring a size
+        larger than the file swallows the whole file as tag, so the answer is
+        <code>NO_FRAMES_FOUND</code> rather than a count. Both were left alone deliberately:
+        detecting them means deciding when a file is lying about itself, which is a larger problem
+        than the one this service solves.
       </p>
       <p><a href="decisions.md">Every decision, with what else was considered →</a></p>
     </details>
@@ -180,15 +198,17 @@
       <ol type="a">
         <li>To keep tags below a maximum size.</li>
         <li>
-          So that no byte inside the tag can carry the eleven set bits of a frame's sync word.
+          So that the size field itself can never contain 0xFF and be misread as the start of a
+          frame.
         </li>
         <li>For compatibility with older text encodings.</li>
       </ol>
       <details>
         <summary>Answer</summary>
         <p>
-          <strong>b</strong> — that is its only purpose, which is why a tag can hold arbitrary bytes
-          — album art included — without ever looking like audio.
+          <strong>b</strong> — and only the size field is protected. The tag body carries no such
+          guarantee: album art inside it is full of 0xFF bytes, which is why the tag must be skipped
+          by its declared size rather than scanned.
         </p>
         <p><a href="#metadata">Full explanation →</a></p>
       </details>

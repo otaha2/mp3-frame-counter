@@ -13,13 +13,17 @@ import { FrameCounter, type FrameCountResult } from '../../src/mp3/frameCounter'
 import { frame, id3v1Tag, id3v2Tag, metadataFrame } from '../helpers/mp3';
 
 const FIXTURES = join(__dirname, '..', 'fixtures');
-const FIXTURE_NAMES = Object.keys(
-  (
-    JSON.parse(readFileSync(join(FIXTURES, 'expected-counts.json'), 'utf8')) as {
-      files: Record<string, unknown>;
-    }
-  ).files,
-);
+const groundTruth = JSON.parse(readFileSync(join(FIXTURES, 'expected-counts.json'), 'utf8')) as {
+  files: Record<string, unknown>;
+  edgeCases: Record<string, unknown>;
+};
+
+/**
+ * Every fixture, well formed or not. The damaged ones matter most here: they are
+ * the inputs that exercise resynchronisation and the end-of-stream decision, so
+ * they are the ones whose answer could plausibly depend on where a chunk falls.
+ */
+const FIXTURE_NAMES = [...Object.keys(groundTruth.files), ...Object.keys(groundTruth.edgeCases)];
 
 /** Feeds `bytes` through the counter in fixed-size pieces. */
 function countInChunks(bytes: Buffer, chunkSize: number): FrameCountResult {

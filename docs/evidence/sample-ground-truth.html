@@ -120,8 +120,8 @@
         <td>1,458,044</td>
         <td>no <code>"TAG"</code></td>
         <td>
-          No ID3v1 tail. The file ends inside the last frame, whose unused payload is padded with
-          0xAA bytes
+          No ID3v1 tail. The last frame is complete — all 104 declared bytes are present — but its
+          audio does not fill them, and the encoder padded the remainder with 0xAA
         </td>
       </tr>
     </table>

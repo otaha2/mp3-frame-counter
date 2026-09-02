@@ -136,6 +136,7 @@ svg .box {
 }
 svg .hot {
   stroke: var(--accent);
+  stroke-width: 2;
   fill: none;
 }
 svg .arrow {
@@ -166,8 +167,19 @@ details > p:first-of-type {
   margin-top: 0.75rem;
 }
 
-/* A question hides its options; the answer inside hides one level further. */
-details details {
+/* A question hides its options; the answer inside hides one level further.
+   The open state has to be restated: details[open] outranks a descendant
+   selector, so without this an opened answer takes its parent's background. */
+details details,
+details details[open] {
   background: var(--bg);
   margin-top: 0.75rem;
+}
+
+/* Wide tables scroll inside themselves rather than pushing the page sideways. */
+@media (max-width: 640px) {
+  table {
+    display: block;
+    overflow-x: auto;
+  }
 }

@@ -57,7 +57,7 @@
         aria-label="Three states: reading a label, walking past a frame, and lost; with the transitions between them"
       >
         <defs>
-          <marker id="fcArrow" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
+          <marker id="head" markerWidth="9" markerHeight="9" refX="8" refY="3" orient="auto">
             <path d="M0,0 L8,3 L0,6" fill="none" stroke="currentColor" />
           </marker>
         </defs>
@@ -102,55 +102,80 @@
       piece of the file will carry on from exactly where it left off.
     </p>
 
+    <h2>Why the last 128 bytes are held back</h2>
+    <p>
+      Some MP3 files end with a 128-byte block of text: the track title, artist, year. It is not
+      audio and must not be counted. The trouble is that you cannot tell you are at the end of a
+      stream until it ends — and by then you have already read the bytes.
+    </p>
+    <p>
+      So the counter always keeps the most recent 128 bytes unexamined, staying deliberately a
+      little behind. When the stream finishes, it looks at those held-back bytes: if they are a tag,
+      it discards them; if they are audio, it counts them. This is why nothing happened in the
+      example above until 200 bytes had arrived — the first 100 were still inside the withheld
+      window.
+    </p>
+
     <h2>Watching it work: a clean file in 100-byte pieces</h2>
     <p>
-      This is the real sample file, fed in through 100 bytes at a time. Its first frame begins at
-      byte 44, after an ID3v2 tag, and is 208 bytes long. The second is 104 bytes.
+      This is the real sample file, fed in 100 bytes at a time. Its first frame begins at byte 44,
+      after an ID3v2 tag, and is 208 bytes long; the second is 104. The <em>frontier</em> column is
+      how far the counter may safely read — the bytes that have arrived, less the 128 it holds back.
     </p>
     <table>
       <tr>
-        <th>Bytes in so far</th>
+        <th>Bytes in</th>
+        <th>Frontier</th>
         <th>What happens</th>
       </tr>
       <tr>
         <td>100</td>
-        <td>Nothing yet — see “the last 128 bytes” below.</td>
+        <td>−28</td>
+        <td>Everything so far is inside the withheld window. Nothing can be read yet.</td>
       </tr>
       <tr>
         <td>200</td>
+        <td>72</td>
         <td>
-          The tag says it is 44 bytes long, so walk past 44. At byte 44 a label appears saying “208
-          bytes”. Not enough of the file has arrived to check it. <em>Wait.</em>
+          The tag's size field says 34, covering the body after its 10-byte header, so the tag
+          occupies 44 bytes in all. Walk past 44. At byte 44 a header appears saying “208 bytes”,
+          but confirming it needs byte 252, well past the frontier. <em>Wait.</em>
         </td>
       </tr>
       <tr>
         <td>300</td>
-        <td>Still not enough to check the label. <em>Wait.</em></td>
+        <td>172</td>
+        <td>Still short of 252. <em>Wait.</em></td>
       </tr>
       <tr>
         <td>400</td>
+        <td>272</td>
         <td>
-          Now byte 252 has arrived, and there is a second label sitting there — exactly where the
-          first one said it would be. Both are believed. Walk past 208 bytes:
-          <strong>frame 1 complete</strong>. Read the label at 252, which says 104, and walk past
-          the 20 bytes of it that have arrived. 84 to go.
+          Byte 252 is now readable, and a second header sits exactly where the first said it would.
+          Both are believed. Walk past 208: the stream's <strong>first frame is complete</strong> —
+          and being the first, it is the Xing frame, so it is tallied as structure and
+          <strong>not</strong> counted as audio. Read the header at 252, which says 104, and walk
+          past the 20 bytes of it that have arrived. 84 to go.
         </td>
       </tr>
       <tr>
         <td>500</td>
+        <td>372</td>
         <td>
-          Walk past the remaining 84: <strong>frame 2 complete</strong>. Read the next label, walk
-          past 16 of its 104 bytes. 88 to go.
+          Walk past the remaining 84: <strong>audio frame 1</strong>. Then 16 of the next 104.
         </td>
       </tr>
       <tr>
         <td>600</td>
-        <td>Walk past 88: <strong>frame 3 complete</strong>. And so on, 6089 times.</td>
+        <td>472</td>
+        <td>Walk past 88: <strong>audio frame 2</strong>. And so on.</td>
       </tr>
     </table>
     <p>
-      Notice what never happened: no byte was ever looked at twice, and nothing was stored except a
-      countdown and a few undecided bytes.
+      The file ends with 6090 frames walked and 6089 counted, the difference being that first Xing
+      frame. Notice what was never kept: apart from the header at byte 44, which is re-examined on
+      each arrival until enough bytes exist to confirm it, nothing was stored but a countdown and a
+      few undecided bytes.
     </p>
 
     <h2>Watching it refuse to guess: unexpected bytes in the middle</h2>
@@ -206,20 +231,6 @@
       yet. When that happens the counter simply stops and waits, holding the candidate frame until
       enough bytes turn up to judge it. This is the only situation in which it holds more than a few
       bytes, and it is bounded by the largest frame the format allows.
-    </p>
-
-    <h2>Why the last 128 bytes are held back</h2>
-    <p>
-      Some MP3 files end with a 128-byte block of text: the track title, artist, year. It is not
-      audio and must not be counted. The trouble is that you cannot tell you are at the end of a
-      stream until it ends — and by then you have already read the bytes.
-    </p>
-    <p>
-      So the counter always keeps the most recent 128 bytes unexamined, staying deliberately a
-      little behind. When the stream finishes, it looks at those held-back bytes: if they are a tag,
-      it discards them; if they are audio, it counts them. This is why nothing happened in the
-      example above until 200 bytes had arrived — the first 100 were still inside the withheld
-      window.
     </p>
 
     <h2>Everything the counter remembers</h2>

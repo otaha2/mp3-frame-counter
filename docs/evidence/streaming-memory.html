@@ -87,21 +87,25 @@
     <p>
       The buffered counter needs slightly more than the input, because holding the file <em>is</em>
       what it does. The streaming counter never exceeds a few per cent of it. What that counter
-      actually retains is about a kilobyte — a partial header, a position, and 128 withheld bytes —
-      so the megabytes that do appear are arriving chunks waiting to be collected rather than
-      anything it is keeping. Both designs return identical counts throughout.
+      actually retains is on the order of a kilobyte and a half — at most one frame while sync is
+      being confirmed, plus a position and 128 withheld bytes — so the megabytes that do appear are
+      arriving chunks waiting to be collected rather than anything it is keeping. Both designs
+      return identical counts throughout.
     </p>
     <p>
       The streaming counter retains only what it cannot yet decide: at most one frame while it is
       looking for the start of the stream, and the trailing 128 bytes that may prove to be an ID3v1
-      tag. The largest MPEG-1 Layer III frame is 1045 bytes, so the ceiling is on the order of a
-      kilobyte whatever the file size.
+      tag. The largest MPEG-1 Layer III frame is 1441 bytes — 320 kbps at 32 kHz, padded — so the
+      ceiling is on the order of a kilobyte and a half whatever the file size.
     </p>
 
     <h2>The same holds through the HTTP layer</h2>
     <p>
-      A 146 MB file — 105 copies of the sample concatenated, so 105 × 6090 − 1 frames, since only
-      the first copy's Xing frame opens the stream — uploaded to a running server.
+      A 146 MB file — 105 copies of the sample concatenated — uploaded to a running server. Its
+      expected count is 105 × 6090 − 1 = 639,449. Each copy contributes all 6090 of its frames,
+      including its Xing frame, because a metadata frame is only excluded when it is the frame that
+      <em>opens the stream</em>; the other 104 are just frames arriving part-way through. Hence the
+      single subtraction rather than 105.
     </p>
     <table>
       <tr>
@@ -131,8 +135,9 @@
     </table>
     <p>
       Two uploads totalling 292 MB moved resident memory by 7.5 MB, none of it proportional to the
-      files. Throughput is roughly 200 MB/s, so the request is bounded by the network rather than by
-      the parsing.
+      files. End to end that is roughly 200 MB/s per request, framing, multipart parsing and socket
+      reads included — the counter alone is several times quicker, as the chunk-size table above
+      shows.
     </p>
 
     <h2>The size limit is enforced without buffering</h2>
@@ -160,7 +165,15 @@
     <p>
       Every figure above was taken over loopback, where bytes arrive as fast as memory can supply
       them. Real clients are slower by one to three orders of magnitude, and consumer connections
-      upload far more slowly than they download. Times below are transfer only.
+      upload far more slowly than they download.
+    </p>
+    <p>
+      Unlike everything else on this page, the table below is
+      <strong>arithmetic, not measurement</strong>: size divided by the nominal link rate, transfer
+      only, with no allowance for protocol overhead, congestion or a link that fails to reach its
+      advertised speed. Real times will be worse. It is here to make the shape of the problem
+      visible — that the parser's contribution is negligible next to the wire — and not as a
+      performance claim.
     </p>
     <table>
       <tr>
@@ -206,7 +219,7 @@
         <td>4.3 s</td>
       </tr>
       <tr>
-        <td>Loopback, as measured above</td>
+        <td>Loopback, the one measured row</td>
         <td>2 ms</td>
         <td>14 ms</td>
         <td>71 ms</td>
@@ -214,10 +227,11 @@
       </tr>
     </table>
     <p>
-      Counting runs at 200 MB/s for a single request and 816 MB/s across eight — between 1.6 and 6.5
-      Gbit/s. Even a client on a gigabit link cannot feed the parser fast enough to strain it, so
-      the throughput figures above describe a floor rather than a ceiling: in production the number
-      being measured would be the network.
+      Whole requests complete at roughly 200 MB/s singly and 816 MB/s across eight, and the counter
+      on its own is quicker still — the 1.39 MB sample above counts in about a millisecond. Even a
+      client on a gigabit link cannot feed the parser fast enough to strain it, so the throughput
+      figures above describe a floor rather than a ceiling: in production the number being measured
+      would be the network.
     </p>
     <p>
       This is also what makes a size limit an awkward instrument. At the top of that table, an
@@ -267,17 +281,21 @@
       </tr>
     </table>
     <p>
-      The last row is the one that matters. Over a gigabyte of upload data was in flight at once and
-      the process never passed 99 MB, because no request ever holds its own file. The buffered
-      design would have needed room for all eight at the same time. Throughput rises with
-      concurrency rather than falling, since one request's counting overlaps another's network wait.
+      The last row is the one that matters: eight uploads totalling over a gigabyte were handled
+      concurrently and the process never passed 99 MB, because no request ever holds its own file.
+      Note that peak memory tracks the number of connections rather than the volume of data — the
+      200-connection batch costs more than the eight-connection one that moved four times as many
+      bytes. The buffered design would have needed room for all eight at the same time. Throughput
+      rises with concurrency rather than falling, since one request's counting overlaps another's
+      network wait.
     </p>
     <p>
       The server answered a normal upload immediately after each batch and logged no errors. Node
-      runs this work on one thread, so the ceiling is CPU rather than memory: past roughly 800 MB/s
-      of counting, further concurrency adds latency instead of throughput. Nothing here limits the
-      number of simultaneous uploads — a real deployment would want one, and it is named in the
-      README's future work.
+      runs this work on one thread, so the ceiling is CPU rather than memory. Where that ceiling
+      lies was not measured: throughput was still climbing at the largest batch tried, and 816 MB/s
+      is the highest figure observed rather than a limit. Nothing here limits the number of
+      simultaneous uploads — a real deployment would want one, and it is named in the README's
+      future work.
     </p>
   </body>
 </html>

@@ -42,8 +42,8 @@
         <td>The tag is not audio and must not be scanned as frames</td>
       </tr>
       <tr>
-        <td>First frame is Xing / Info / VBRI</td>
-        <td>Count it as structure, not audio</td>
+        <td>The <em>first</em> frame of the stream is Xing / Info / VBRI</td>
+        <td>Tally it separately; do <strong>not</strong> include it in <code>frameCount</code></td>
         <td>
           It carries encoder metadata, not sound — <a href="../decisions.md">decisions.md</a> D1 and
           D11
@@ -60,6 +60,11 @@
         <td>A lone sync word occurs readily in ordinary binary data; two that agree do not</td>
       </tr>
       <tr>
+        <td>Out of sync, and the candidate ends exactly at the end of the stream</td>
+        <td>Accept it — there is no second header, and there never will be</td>
+        <td>Otherwise a file holding a single frame would be reported as holding none</td>
+      </tr>
+      <tr>
         <td>Final frame runs past the end</td>
         <td>Do not count it</td>
         <td>Its audio is not in the file; counting it would overstate the content</td>
@@ -74,6 +79,14 @@
       the first one's declared length says it should — a coincidence that arbitrary data almost
       never produces. Once the chain is established each link is trusted on its own, so the check
       costs nothing on an undamaged file.
+    </p>
+    <p>
+      There is exactly one place the rule relaxes. If the stream ends and the candidate's declared
+      length lands precisely on the last byte, no confirming header can ever arrive, so the
+      candidate is accepted. Without that, a file containing a single frame would be reported as
+      containing none. The cost is that four bytes of arbitrary data could be counted as one frame
+      if they happen to parse as a header <em>and</em> declare a length reaching exactly the end of
+      the file — a coincidence that has to hold to the byte, and which at worst is off by one.
     </p>
     <p>
       This is worth being clear about, because damaged MP3s are rare and nothing in this service's

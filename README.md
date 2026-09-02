@@ -111,11 +111,23 @@ Every error shares one shape:
 The endpoint counts **one MPEG Version 1, Layer III file per request**. These
 sit deliberately outside that, named here rather than half-built:
 
-| Outside scope                         | What happens instead                                                             |
-| ------------------------------------- | -------------------------------------------------------------------------------- |
-| MPEG Version 2 / 2.5, Layers I and II | Rejected with `NO_FRAMES_FOUND`, naming the supported format                     |
-| Free-format bitrate                   | Rejected: its length is not in its header, so the counter cannot step past it    |
-| More than one file in a request       | The first file is read; the only promise is that it is never answered with a 5xx |
+| Outside scope                                            | What happens instead                                                                                        |
+| -------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
+| MPEG Version 2 / 2.5, Layers I and II                    | Rejected with `NO_FRAMES_FOUND`, naming the supported format                                                |
+| Free-format bitrate                                      | Rejected: its length is not in its header, so the counter cannot step past it                               |
+| More than one file in a request                          | Either a count for the first file or a 400, depending on timing; the only promise is that it is never a 5xx |
+| `TAG` 128 bytes from the end of audio                    | Read as an ID3v1 tag and excluded, which can cost the final frame — see below                               |
+| An ID3v2 header declaring more bytes than the file holds | The whole file is skipped as tag, giving `NO_FRAMES_FOUND` rather than a count                              |
+
+The last two are consequences of trusting what the file says about itself,
+which is the only thing a reader can do. An ID3v1 tag is identified by three
+bytes at a fixed distance from the end, so audio ending in those three bytes at
+exactly that offset is mistaken for one; the cost is bounded at a single frame.
+An ID3v2 header declaring a size larger than the file is likewise taken at its
+word, and the audio after it is never reached. Both are cheap to detect and
+were left alone on purpose: a check that second-guesses the file would have to
+decide when the file is lying, and that is a larger problem than the one being
+solved here.
 
 ## Repository layout
 
@@ -148,8 +160,7 @@ Roughly in the order I would take them.
 
 - **Limit how many uploads run at once.** Memory per request is flat, but
   nothing caps concurrency, and the counting itself runs on a single thread.
-  Past roughly 800 MB/s of combined throughput, extra requests make everyone
-  slower rather than getting more done. A queue or a connection limit would make
+  Beyond some level of load extra requests make everyone slower rather than getting more done; throughput was still rising at the largest batch measured, so where that point lies is not yet known. A queue or a connection limit would make
   that slowdown orderly instead of spreading it across every caller.
 
 - **Accept an upload in pieces, so a slow client can finish.** A 512 MiB file
