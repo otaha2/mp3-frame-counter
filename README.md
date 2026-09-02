@@ -40,6 +40,16 @@ Either way:
 
 That count is the one `mediainfo` reports for the same file.
 
+On **Windows PowerShell** write `curl.exe` rather than `curl`: the shell aliases
+the bare name to `Invoke-WebRequest`, which has no `-F` and will refuse the
+command. PowerShell 7, cmd, macOS and Linux all take `curl` as written. If you
+would rather not use curl at all, PowerShell 7 can post the file natively:
+
+```powershell
+(Invoke-WebRequest -Uri http://localhost:3000/file-upload -Method Post `
+  -Form @{ file = Get-Item 'test/fixtures/sample.mp3' }).Content
+```
+
 ## Test it
 
 ```bash
