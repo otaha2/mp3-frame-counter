@@ -41,7 +41,7 @@ declares. (c) Count 6090 less the metadata frame.
 the Xing field all agree on 6089. (b) is rejected because the count has to come
 from parsing frames — that field is a cross-check, not the source.
 
-**Evidence.** [The sample, byte by byte](evidence/sample-ground-truth.html)
+**Evidence.** [The sample, byte by byte](https://otaha2.github.io/mp3-frame-counter/evidence/sample-ground-truth.html)
 
 ## D4 — Fastify rather than Express
 
@@ -56,7 +56,7 @@ held in memory?
 whereas multer's defaults buffer to memory or disk — the opposite of what large
 uploads need. Fastify's `inject()` also allows HTTP tests that open no sockets.
 
-**Evidence.** [Architecture](model/architecture.html)
+**Evidence.** [Architecture](https://otaha2.github.io/mp3-frame-counter/model/architecture.html)
 
 ## D5 — One error shape, carrying a `code`
 
@@ -105,7 +105,7 @@ header, so (a) means searching for every following sync word — abandoning the
 jump-by-length approach the whole counter is built on, for a format the brief
 does not require.
 
-**Evidence.** [The file format](concepts/mp3-structure.html)
+**Evidence.** [The file format](https://otaha2.github.io/mp3-frame-counter/concepts/mp3-structure.html)
 
 ## D11 — Following ffprobe where the reference tools disagree
 
@@ -124,7 +124,7 @@ the other. `ffprobe` excludes the metadata frame in both cases, as does each
 file's own count field. Matching the tool that contradicts itself would make the
 answer depend on how the file happened to be encoded.
 
-**Evidence.** [Where the tools disagree](evidence/sample-ground-truth.html)
+**Evidence.** [Where the tools disagree](https://otaha2.github.io/mp3-frame-counter/evidence/sample-ground-truth.html)
 
 ## D12 — Two headers before trusting a resync
 
@@ -149,7 +149,7 @@ principle credit one frame to four bytes of noise that both parse as a header
 and declare a length reaching exactly the last byte; the error is bounded at one
 frame, against a real file that would otherwise be miscounted.
 
-**Evidence.** [The counting rules](concepts/frame-counting.html)
+**Evidence.** [The counting rules](https://otaha2.github.io/mp3-frame-counter/concepts/frame-counting.html)
 
 ## D14 — Accepting the MP3 as a raw request body
 
@@ -200,7 +200,7 @@ at most one frame while it looks for the start of the stream, plus the trailing
 delegating means the existing counter tests exercise the streaming machine,
 leaving chunk-size invariance as the only new thing to test.
 
-**Evidence.** [Measurements](evidence/streaming-memory.html)
+**Evidence.** [Measurements](https://otaha2.github.io/mp3-frame-counter/evidence/streaming-memory.html)
 
 ## D17 — Counting a truncated file rather than refusing it
 
@@ -344,7 +344,7 @@ and the page follows it, which is the same rule
 `test/fixtures/expected-counts.json` already applies to the counter.
 
 **Evidence.** `test/docs/frameWalker.test.ts`, and
-[the walkthrough itself](play/frame-walker.html)
+[the walkthrough itself](https://otaha2.github.io/mp3-frame-counter/play/frame-walker.html)
 
 ## Smaller choices
 

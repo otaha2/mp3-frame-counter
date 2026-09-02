@@ -86,7 +86,7 @@ reproduce: all five were rebuilt with the commands above and match.
 
 Regenerating a fixture changes its frame count. Re-derive the expectation with
 `mediainfo` and `ffprobe -count_frames`, read
-[the ground-truth page](evidence/sample-ground-truth.html) on how to reconcile
+[the ground-truth page](https://otaha2.github.io/mp3-frame-counter/evidence/sample-ground-truth.html) on how to reconcile
 them when they disagree, and record the new number in `expected-counts.json`.
 
 ## Code style

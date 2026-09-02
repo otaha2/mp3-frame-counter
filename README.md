@@ -62,7 +62,7 @@ npm run bench
 ```
 
 Reproduces the memory and chunk-size measurements quoted in
-[the evidence pages](docs/evidence/streaming-memory.html): the same input counted
+[the evidence pages](https://otaha2.github.io/mp3-frame-counter/evidence/streaming-memory.html): the same input counted
 by the current design and by the buffered one it replaced, and the sample counted
 at chunk sizes from one byte upwards.
 
@@ -152,18 +152,17 @@ domain knowledge, **evidence** for anything measured with an outside tool,
 lives, and **play**, which is one page. Reasoning is not repeated in them; it
 stays in [decisions.md](docs/decisions.md) and is linked.
 
-[docs/play/frame-walker.html](docs/play/frame-walker.html) is a walkthrough that
+[Frame Walker](https://otaha2.github.io/mp3-frame-counter/play/frame-walker.html) is a walkthrough that
 hands the reader the job: decode a header, walk a file frame by frame to its
 end, then count a second file while its bytes are still arriving. It is the
 fastest way into the domain, and the two files it uses are not illustrations —
 `test/docs/frameWalker.test.ts` rebuilds them as real MP3 bytes and checks this
 parser returns the numbers the page teaches.
 
-The whole log is published at
-**<https://otaha2.github.io/mp3-frame-counter/>**, where the pages render and
-the walkthrough is playable in a browser.
-
-[docs/index.html](docs/index.html) is the only table of contents.
+These pages are HTML and GitHub shows HTML as source, so read them on the
+published site: **<https://otaha2.github.io/mp3-frame-counter/>**. Its front page
+is the only table of contents, and it opens with the order to read things in.
+The files themselves live in [docs/](docs).
 
 ## Future work
 
