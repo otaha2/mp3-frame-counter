@@ -159,6 +159,10 @@ fastest way into the domain, and the two files it uses are not illustrations —
 `test/docs/frameWalker.test.ts` rebuilds them as real MP3 bytes and checks this
 parser returns the numbers the page teaches.
 
+The whole log is published at
+**<https://otaha2.github.io/mp3-frame-counter/>**, where the pages render and
+the walkthrough is playable in a browser.
+
 [docs/index.html](docs/index.html) is the only table of contents.
 
 ## Future work
