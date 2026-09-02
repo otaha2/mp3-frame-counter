@@ -156,6 +156,76 @@
       is the failure mode worth checking: rejecting a request part-way through its body leaves the
       connection to be torn down correctly.
     </p>
+    <h2>The network is the limit, not the parser</h2>
+    <p>
+      Every figure above was taken over loopback, where bytes arrive as fast as memory can supply
+      them. Real clients are slower by one to three orders of magnitude, and consumer connections
+      upload far more slowly than they download. Times below are transfer only.
+    </p>
+    <table>
+      <tr>
+        <th>Upload link</th>
+        <th><code>sample.mp3</code><br />1.4 MB</th>
+        <th>5-minute track<br />320 kbps, 11 MB</th>
+        <th>1-hour podcast<br />128 kbps, 55 MB</th>
+        <th>The 512 MiB limit</th>
+      </tr>
+      <tr>
+        <td>Mobile 4G, ~10 Mbit/s</td>
+        <td>1.2 s</td>
+        <td>9.2 s</td>
+        <td>46 s</td>
+        <td><mark>7.2 min</mark></td>
+      </tr>
+      <tr>
+        <td>Home broadband, ~20 Mbit/s up</td>
+        <td>0.6 s</td>
+        <td>4.6 s</td>
+        <td>23 s</td>
+        <td>3.6 min</td>
+      </tr>
+      <tr>
+        <td>Mobile 5G, ~50 Mbit/s</td>
+        <td>0.2 s</td>
+        <td>1.8 s</td>
+        <td>9.2 s</td>
+        <td>86 s</td>
+      </tr>
+      <tr>
+        <td>Home fibre, ~300 Mbit/s</td>
+        <td>39 ms</td>
+        <td>0.3 s</td>
+        <td>1.5 s</td>
+        <td>14 s</td>
+      </tr>
+      <tr>
+        <td>Office or datacentre, 1 Gbit/s</td>
+        <td>12 ms</td>
+        <td>92 ms</td>
+        <td>0.5 s</td>
+        <td>4.3 s</td>
+      </tr>
+      <tr>
+        <td>Loopback, as measured above</td>
+        <td>2 ms</td>
+        <td>14 ms</td>
+        <td>71 ms</td>
+        <td>0.7 s</td>
+      </tr>
+    </table>
+    <p>
+      Counting runs at 200 MB/s for a single request and 816 MB/s across eight — between 1.6 and 6.5
+      Gbit/s. Even a client on a gigabit link cannot feed the parser fast enough to strain it, so
+      the throughput figures above describe a floor rather than a ceiling: in production the number
+      being measured would be the network.
+    </p>
+    <p>
+      This is also what makes a size limit an awkward instrument. At the top of that table, an
+      upload at the 512 MiB limit takes over seven minutes, which is longer than many proxies and
+      load balancers allow a request to run. The cap that matters for a slow client is not how many
+      bytes it may send but how long it may take, and the two are only loosely related.
+    </p>
+
     <h2>Many uploads at once</h2>
     <p>
       Flat memory per request is only half of scalability; the other half is what happens when

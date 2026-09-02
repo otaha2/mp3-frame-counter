@@ -20,6 +20,7 @@ never reused, so entries elsewhere can refer to them.
 - [D18 — Unreadable uploads are client errors](#d18--unreadable-uploads-are-client-errors)
 - [D19 — Routing failures carry a `code` too](#d19--routing-failures-carry-a-code-too)
 - [D20 — One file per request](#d20--one-file-per-request)
+- [D21 — The upload size limit is 512 MiB](#d21--the-upload-size-limit-is-512-mib)
 
 Also here: four [smaller choices](#smaller-choices) — the TypeScript version,
 CommonJS, the `dev` script and configuration — and two entries that have been
@@ -268,6 +269,30 @@ error rather than a feature to build. Both (a) and (b) mean reading a body that
 should not have been sent — answering early resets a client that is still
 sending — which is a real cost for a case no client should produce. The boundary
 is named in the README instead of being half-built.
+
+## D21 — The upload size limit is 512 MiB
+
+**Question.** How large an upload should the endpoint accept by default?
+
+**Options.** (a) 200 MiB, the value first chosen. (b) 512 MiB. (c) No limit at
+all.
+
+**Decision.** (b), configurable through `MAX_UPLOAD_BYTES`.
+
+**Why.** The limit does not protect memory — counting is incremental, so 417 MB
+is counted in 13.9 MB and the cap changes nothing about that. What it bounds is
+how long one request may hold a connection. 200 MiB was picked as a round number
+before any of that was measured, and it turns out to refuse files people really
+have: a two-hour set at 320 kbps is 275 MiB and a ten-hour audiobook at 128 kbps
+is 549 MiB. Refusing those bought nothing, since the memory cost of accepting
+them is the same. 512 MiB covers about nine hours at 128 kbps and nearly four at
+320, which is beyond any single MP3 likely to be uploaded. (c) is wrong because a
+request should not be able to run indefinitely. A deployment that cares more
+about connection time than file length should lower it — on a 10 Mbit/s link
+512 MiB takes seven minutes to send, which is longer than many proxies allow.
+
+**Evidence.** `src/config.ts`; the limit is exercised on both upload paths in
+`test/http/fileUpload.test.ts`.
 
 ## Smaller choices
 

@@ -216,11 +216,11 @@
       </tr>
       <tr>
         <th>Peak memory per request</th>
-        <td>Size of the upload, capped by <code>MAX_UPLOAD_BYTES</code> (200 MiB)</td>
+        <td>Size of the upload, capped by <code>MAX_UPLOAD_BYTES</code></td>
         <td>About a kilobyte, whatever the file size</td>
       </tr>
       <tr>
-        <th>Concurrent 200 MiB uploads</th>
+        <th>Concurrent large uploads</th>
         <td>Each holds its own buffer; 10 at once is ~2 GiB</td>
         <td>Cost is the same as one</td>
       </tr>

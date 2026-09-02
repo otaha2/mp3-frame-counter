@@ -95,7 +95,7 @@ Every error shares one shape:
 | ------------------ | --------------------- | ------------------------------------- |
 | `PORT`             | `3000`                | Listen port                           |
 | `HOST`             | `0.0.0.0`             | Listen address                        |
-| `MAX_UPLOAD_BYTES` | `209715200` (200 MiB) | Requests larger than this are refused |
+| `MAX_UPLOAD_BYTES` | `536870912` (512 MiB) | Requests larger than this are refused |
 
 ## Scope
 
@@ -142,6 +142,15 @@ Roughly in the order I would take them.
   Past roughly 800 MB/s of combined throughput, extra requests make everyone
   slower rather than getting more done. A queue or a connection limit would make
   that slowdown orderly instead of spreading it across every caller.
+
+- **Accept an upload in pieces, so a slow client can finish.** A 512 MiB file
+  takes over seven minutes to send from a phone, and many proxies cut a request
+  off long before that — so the largest files this service accepts are the ones
+  a mobile client is least able to deliver. Taking the file as a series of short
+  requests, each acknowledged, would sidestep both the timeout and the need to
+  start again when a connection drops. The counter is already most of the way
+  there: its state is about a kilobyte, so it could be set aside between
+  requests rather than holding the file.
 
 - **Give up sooner on a file that is not an MP3.** When an upload turns out to
   be something else, the counter looks for a frame starting at every single

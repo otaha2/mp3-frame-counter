@@ -6,15 +6,18 @@
  */
 
 /**
- * Default cap on a single uploaded file: 200 MiB, i.e. 209,715,200 bytes or
- * roughly 0.2 GB — about 3.5 hours of 128 kbps audio.
+ * Default cap on a single uploaded file: 512 MiB, which is about nine hours of
+ * 128 kbps audio or nearly four at 320.
  *
- * This is a policy limit, not a memory ceiling. The upload is consumed as a
- * stream, so memory stays flat whatever the file size; the cap exists to bound
- * how long one request may hold a connection, and to refuse a client early
- * rather than after it has sent gigabytes.
+ * This is a policy limit, not a memory ceiling. The upload is counted as it
+ * arrives, so memory does not depend on it; the cap bounds how long one request
+ * may hold a connection and refuses a client early rather than after it has
+ * sent gigabytes. It is set from the length of a plausible single MP3 — a
+ * two-hour set at 320 kbps is already 275 MiB — so that no real file is turned
+ * away for a limit that protects nothing. A deployment that cares more about
+ * connection time than file length should lower it.
  */
-const DEFAULT_MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+const DEFAULT_MAX_UPLOAD_BYTES = 512 * 1024 * 1024;
 const DEFAULT_PORT = 3000;
 const DEFAULT_HOST = '0.0.0.0';
 

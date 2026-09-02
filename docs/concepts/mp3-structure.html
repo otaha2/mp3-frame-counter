@@ -63,59 +63,90 @@
 
     <h2>The four-byte header</h2>
     <p>
-      The fields below are packed into 32 bits, most significant first. The first eleven are all 1s
-      — the <strong>sync word</strong>, the pattern a reader looks for to find where a frame begins.
+      The fields are packed into 32 bits, most significant first. The letters are the labels the
+      MPEG specification uses, so other references can be read alongside this table.
     </p>
     <table>
       <tr>
+        <th></th>
         <th>Bits</th>
+        <th>Size</th>
         <th>Field</th>
         <th>Accepted values (this project)</th>
       </tr>
       <tr>
+        <td>A</td>
         <td>31–21</td>
-        <td>Sync</td>
+        <td>11</td>
+        <td>Sync word</td>
         <td>all 1s (<code>0x7FF</code>)</td>
       </tr>
       <tr>
+        <td>B</td>
         <td>20–19</td>
-        <td>Version</td>
-        <td><code>11</code> = MPEG-1 only (per assignment)</td>
+        <td>2</td>
+        <td>MPEG version</td>
+        <td><code>11</code> = MPEG-1 only; <code>10</code> is MPEG-2, out of scope</td>
       </tr>
       <tr>
+        <td>C</td>
         <td>18–17</td>
+        <td>2</td>
         <td>Layer</td>
         <td><code>01</code> = Layer III only</td>
       </tr>
       <tr>
+        <td>D</td>
         <td>16</td>
+        <td>1</td>
         <td>CRC protection</td>
-        <td>either — adds a checksum to the payload, but does not change the frame's length</td>
+        <td>either; <code>0</code> puts a two-byte checksum after the header</td>
       </tr>
       <tr>
+        <td>E</td>
         <td>15–12</td>
+        <td>4</td>
         <td>Bitrate index</td>
         <td>1–14 → 32…320 kbps; <code>0000</code> (free) and <code>1111</code> rejected</td>
       </tr>
       <tr>
+        <td>F</td>
         <td>11–10</td>
-        <td>Sample-rate index</td>
+        <td>2</td>
+        <td>Sampling rate index</td>
         <td>
           <code>00</code>=44100, <code>01</code>=48000, <code>10</code>=32000;
           <code>11</code> rejected
         </td>
       </tr>
       <tr>
+        <td>G</td>
         <td>9</td>
+        <td>1</td>
         <td>Padding</td>
-        <td>0 or 1 — adds one byte to the frame</td>
+        <td>0 or 1 — adds one byte to this frame only</td>
       </tr>
       <tr>
+        <td>H</td>
         <td>8–0</td>
-        <td>Private, channel mode, mode ext., copyright, original, emphasis</td>
-        <td>any — irrelevant to frame length</td>
+        <td>9</td>
+        <td>Private, channel mode, mode extension, copyright, original, emphasis</td>
+        <td>any; only the channel mode is read, and only to locate a Xing marker</td>
       </tr>
     </table>
+    <p>
+      In bytes, a header opens with <code>0xFF</code> followed by a byte whose top three bits are
+      set — which is why real files are full of <code>FF FB</code> and <code>FF FA</code>. Searching
+      for that pattern is how a reader finds its place, but this counter only searches when it has
+      lost it: while in sync it steps to the next header by arithmetic, which is both faster and far
+      less prone to false positives.
+    </p>
+    <p>
+      The CRC is worth being careful about. When bit D is <code>0</code> a two-byte checksum follows
+      the header, but the frame does not become two bytes longer — the checksum takes space that
+      would otherwise hold audio. Frame length is decided by bitrate, sampling rate and padding
+      alone, which is why this parser can ignore the CRC entirely.
+    </p>
 
     <p>
       MPEG-1 Layer III bitrate table (index → kbps):
